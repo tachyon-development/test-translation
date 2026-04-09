@@ -110,6 +110,7 @@ function MobileDot({ status }: { status: "pending" | "active" | "complete" }) {
 export function ProgressStepper({ currentStep, steps }: ProgressStepperProps) {
   return (
     <motion.div
+      data-testid="progress-stepper"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}

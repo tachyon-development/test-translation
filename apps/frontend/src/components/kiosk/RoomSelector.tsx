@@ -30,6 +30,7 @@ export function RoomSelector({ value, onChange, error }: RoomSelectorProps) {
       <div className="relative">
         <input
           id="room-number"
+          data-testid="room-input"
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"

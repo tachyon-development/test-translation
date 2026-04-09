@@ -83,6 +83,7 @@ export function WorkflowCard({ workflow, onClick, index = 0 }: WorkflowCardProps
 
   return (
     <motion.div
+      data-testid="workflow-card"
       layout
       layoutId={workflow.id}
       initial={{ opacity: 0, y: 20 }}

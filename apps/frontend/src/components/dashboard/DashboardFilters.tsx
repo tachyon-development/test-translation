@@ -34,7 +34,7 @@ export function DashboardFilters({
         value={filters.department}
         onValueChange={(val) => onChange({ ...filters, department: val })}
       >
-        <SelectTrigger className="w-full sm:w-[180px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+        <SelectTrigger data-testid="dept-filter" className="w-full sm:w-[180px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
           <SelectValue placeholder="All Departments" />
         </SelectTrigger>
         <SelectContent>

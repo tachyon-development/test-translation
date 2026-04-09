@@ -373,6 +373,7 @@ function KioskInner() {
               >
                 <textarea
                   id="request-text"
+                  data-testid="request-input"
                   rows={4}
                   placeholder="I need extra towels, the AC seems a bit warm, or anything else..."
                   value={requestText}
@@ -394,6 +395,7 @@ function KioskInner() {
                 className="w-full"
               >
                 <motion.button
+                  data-testid="submit-button"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   disabled={submitting || !requestText.trim()}

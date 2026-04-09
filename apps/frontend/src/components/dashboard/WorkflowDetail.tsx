@@ -200,6 +200,7 @@ export function WorkflowDetail({
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
+        data-testid="workflow-detail"
         side="right"
         className="w-full sm:w-[450px] sm:max-w-[90vw] h-full overflow-hidden border-l border-white/10 bg-[var(--bg-secondary)]/95 backdrop-blur-xl p-0"
       >

@@ -84,7 +84,7 @@ export function ClassificationOverride({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md border-[#c17767]/20 bg-[var(--bg-secondary)]/95 backdrop-blur-xl">
+      <DialogContent data-testid="classification-override" className="max-w-md border-[#c17767]/20 bg-[var(--bg-secondary)]/95 backdrop-blur-xl">
         <DialogHeader>
           <DialogTitle className="text-[var(--text-primary)]">
             Override AI Classification
