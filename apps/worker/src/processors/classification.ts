@@ -189,14 +189,18 @@ export function createClassificationWorker() {
 
       const result: ClassifyResult = JSON.parse(jsonMatch[0]);
 
-      // 6. Find matching department
-      const matchedDept = departments.find(
-        (d) => d.name.toLowerCase() === result.department.toLowerCase(),
-      );
+      // 6. Find matching department (exact match, then slug match, then fuzzy)
+      const deptLower = result.department.toLowerCase().trim();
+      const matchedDept =
+        departments.find((d) => d.name.toLowerCase() === deptLower) ||
+        departments.find((d) => d.slug.toLowerCase() === deptLower) ||
+        departments.find((d) => deptLower.includes(d.slug.toLowerCase())) ||
+        departments.find((d) => d.name.toLowerCase().includes(deptLower)) ||
+        departments.find((d) => deptLower.includes(d.name.toLowerCase().split(" ")[0]));
 
       if (!matchedDept) {
         console.warn(
-          `Department "${result.department}" not found, using first department`,
+          `Department "${result.department}" not found in [${departments.map(d => d.name).join(", ")}], using first`,
         );
       }
 
