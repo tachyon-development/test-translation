@@ -34,7 +34,7 @@ export function ConnectionStatus({ status, retryIn }: ConnectionStatusProps) {
   const config = statusConfig[status];
 
   return (
-    <div className="fixed top-4 right-4 z-40 flex items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs shadow-lg">
+    <div className="flex items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs shadow-lg">
       <span className={cn("h-2 w-2 rounded-full", config.dotClass)} />
       <span className={cn("font-medium", config.textClass)}>
         {config.label}

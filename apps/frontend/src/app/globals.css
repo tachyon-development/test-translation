@@ -27,6 +27,16 @@
   --status-danger: #c17767;
   --status-info: #6b8cae;
   --status-pending: #8a7fb5;
+
+  /* Dashboard — priority left-border colors */
+  --priority-low: #5a6e5f;
+  --priority-medium: #6b8cae;
+  --priority-high: #c9a84c;
+  --priority-critical: #c17767;
+
+  /* Dashboard — elevated surface */
+  --bg-elevated: #222238;
+  --bg-surface: #2a2a42;
 }
 
 body {
