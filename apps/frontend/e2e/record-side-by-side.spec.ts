@@ -263,3 +263,105 @@ test('Side-by-side: Staff claims workflow while Guest watches', async ({ browser
     }
   }
 });
+
+test('Side-by-side: Mandarin guest → AI translates & routes', async ({ browser, request }) => {
+  test.setTimeout(120_000);
+
+  const outDir = 'test-results/side-by-side';
+  if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+
+  const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
+
+  const guestCtx = await browser.newContext({
+    viewport: { width: 640, height: 720 },
+    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+  });
+  const staffCtx = await browser.newContext({
+    viewport: { width: 640, height: 720 },
+    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+  });
+
+  const guestPage = await guestCtx.newPage();
+  const staffPage = await staffCtx.newPage();
+
+  // Staff: open dashboard
+  await staffPage.goto(`${PROD_URL}/`);
+  await staffPage.evaluate((t: string) => localStorage.setItem('hospiq_token', t), staffToken);
+  await staffPage.goto(`${PROD_URL}/dashboard`);
+  await staffPage.waitForLoadState('networkidle');
+  await showOverlay(staffPage, 'STAFF DASHBOARD — Waiting for requests');
+  await staffPage.waitForTimeout(2000);
+
+  // Guest: open kiosk
+  await guestPage.goto(`${PROD_URL}/`);
+  await guestPage.waitForLoadState('networkidle');
+  await showOverlay(guestPage, 'GUEST KIOSK — Mandarin-speaking guest');
+  await guestPage.waitForTimeout(2000);
+
+  // Guest: fill room
+  const roomInput = guestPage.locator('[data-testid="room-input"]');
+  if (await roomInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await roomInput.fill('601');
+  }
+  await guestPage.waitForTimeout(1000);
+
+  // Guest: type in Mandarin (character by character for effect)
+  await showOverlay(guestPage, 'GUEST — Typing request in Mandarin Chinese');
+  const textInput = guestPage.locator('[data-testid="request-input"]');
+  if (await textInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await textInput.click();
+    // Type the Mandarin text directly (paste-style since we can't type CJK char by char)
+    await textInput.fill('空调坏了，房间里非常热，请尽快修理');
+    await guestPage.waitForTimeout(1500);
+  }
+
+  await showOverlay(guestPage, 'GUEST — "The AC is broken, the room is very hot, please fix ASAP"');
+  await guestPage.waitForTimeout(3000);
+
+  // Staff: waiting
+  await showOverlay(staffPage, 'STAFF — Watching for incoming requests...');
+  await staffPage.waitForTimeout(1000);
+
+  // Guest: submit
+  await showOverlay(guestPage, 'SUBMITTING — Mandarin request to AI', GOLD);
+  const submitBtn = guestPage.locator('[data-testid="submit-button"]');
+  if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await submitBtn.click();
+  }
+  await guestPage.waitForTimeout(2000);
+
+  // AI processing
+  await showOverlay(guestPage, 'AI — Groq translating Mandarin to English + classifying');
+  await showOverlay(staffPage, 'STAFF — AI processing Mandarin request...');
+  await staffPage.waitForTimeout(10000);
+
+  // Results
+  await showOverlay(guestPage, 'TRANSLATED — Routed to Maintenance (Critical)', SAGE);
+  await showOverlay(staffPage, 'NEW CARD — Mandarin request auto-translated!', SAGE);
+  await guestPage.waitForTimeout(4000);
+
+  // Final
+  await showOverlay(guestPage, 'Guest sees progress in real-time', SAGE);
+  await showOverlay(staffPage, 'Staff sees English translation + department', SAGE);
+  await guestPage.waitForTimeout(4000);
+
+  const guestVideoPath = await guestPage.video()?.path();
+  const staffVideoPath = await staffPage.video()?.path();
+
+  await guestCtx.close();
+  await staffCtx.close();
+
+  if (guestVideoPath && staffVideoPath) {
+    try {
+      execSync(
+        `ffmpeg -y -i "${guestVideoPath}" -i "${staffVideoPath}" ` +
+        `-filter_complex "[0:v]scale=640:720[left];[1:v]scale=640:720[right];[left][right]hstack=inputs=2" ` +
+        `-t 40 -r 15 "docs/demo-mandarin.mp4"`,
+        { stdio: 'pipe', timeout: 60000 }
+      );
+      console.log('✅ Mandarin demo: docs/demo-mandarin.mp4');
+    } catch (e) {
+      console.error('ffmpeg failed:', e);
+    }
+  }
+});
