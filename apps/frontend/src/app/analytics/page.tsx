@@ -3,17 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  LayoutDashboard,
-  BarChart3,
-  Users,
-  Settings,
-  LogOut,
-  Activity,
-} from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { getUser, clearToken, isAuthenticated } from "@/lib/auth";
+import { getUser, isAuthenticated } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
+import { AppShell } from "@/components/shared/AppShell";
 import { AnalyticsSkeleton } from "@/components/analytics/AnalyticsSkeleton";
 import { KPICard } from "@/components/analytics/KPICard";
 import { StreamGraph } from "@/components/analytics/StreamGraph";
@@ -22,14 +14,6 @@ import { ConfidenceHistogram } from "@/components/analytics/ConfidenceHistogram"
 import { LiveFeed } from "@/components/analytics/LiveFeed";
 import { SystemHealth } from "@/components/analytics/SystemHealth";
 import { SLAComplianceArc } from "@/components/analytics/SLAComplianceArc";
-
-// Sidebar nav items
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", active: false },
-  { label: "Analytics", icon: BarChart3, href: "/analytics", active: true },
-  { label: "Manager", icon: Users, href: "/manager", active: false },
-  { label: "Admin", icon: Settings, href: "/admin", active: false },
-];
 
 interface OverviewKPIs {
   activeWorkflows: number;
@@ -74,8 +58,6 @@ export default function AnalyticsPage() {
     setReady(true);
   }, [router]);
 
-  const user = getUser();
-
   const fetchKPIs = useCallback(async () => {
     try {
       const res = await apiRequest<OverviewKPIs>("/api/analytics/overview");
@@ -96,90 +78,29 @@ export default function AnalyticsPage() {
     return () => clearInterval(interval);
   }, [ready, fetchKPIs]);
 
-  const handleLogout = () => {
-    clearToken();
-    router.replace("/login");
-  };
-
   if (!ready) {
     return <AnalyticsSkeleton />;
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-white/5 bg-[var(--bg-primary)]">
-        {/* Logo */}
-        <div className="flex items-center gap-2 border-b border-white/5 px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent,#d4a574)]/10">
-            <Activity className="h-4 w-4 text-[var(--accent,#d4a574)]" />
-          </div>
-          <h1 className="font-display text-xl font-bold text-[var(--text-primary)]">
-            Hospi<span className="text-[var(--accent,#d4a574)]">Q</span>
-          </h1>
-        </div>
-
-        <ScrollArea className="flex-1">
-          <div className="px-3 py-4">
-            <nav className="space-y-0.5">
-              {navItems.map((item) => (
-                <button
-                  key={item.label}
-                  onClick={() => (item.active ? null : router.push(item.href))}
-                  className={`
-                    flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors
-                    ${
-                      item.active
-                        ? "bg-[var(--accent,#d4a574)]/10 text-[var(--accent,#d4a574)]"
-                        : "text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]"
-                    }
-                  `}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </ScrollArea>
-
-        {/* User info + logout */}
-        <div className="border-t border-white/5 p-3">
-          <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent,#d4a574)]/10 text-[10px] font-bold text-[var(--accent,#d4a574)]">
-              {user?.role?.[0]?.toUpperCase() ?? "?"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-[var(--text-primary)]">
-                {user?.role ?? "Unknown"}
-              </p>
-              <p className="truncate text-[10px] text-[var(--text-muted)]">
-                {user?.sub?.slice(0, 8) ?? ""}
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-white/5 hover:text-[var(--text-primary)]"
-              title="Logout"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </aside>
-
+    <AppShell
+      activePage="analytics"
+      headerRight={
+        <span className="text-sm text-[var(--text-muted)]">Hotel Mariana</span>
+      }
+    >
       {/* Main content */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between border-b border-white/5 px-6 py-3">
+        <header className="flex items-center justify-between border-b border-white/5 px-4 py-3 md:px-6">
           <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
             HospiQ Analytics
           </h2>
-          <span className="text-sm text-[var(--text-muted)]">Hotel Mariana</span>
+          <span className="hidden md:inline text-sm text-[var(--text-muted)]">Hotel Mariana</span>
         </header>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-4 md:p-6">
           {!kpis ? (
             <AnalyticsSkeleton />
           ) : (
@@ -189,7 +110,7 @@ export default function AnalyticsPage() {
               className="space-y-6"
             >
               {/* KPI row */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 md:gap-4">
                 <KPICard
                   label="Active Workflows"
                   value={kpis.activeWorkflows}
@@ -242,6 +163,6 @@ export default function AnalyticsPage() {
           )}
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
