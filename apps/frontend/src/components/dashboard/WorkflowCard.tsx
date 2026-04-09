@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { SLACountdown } from "./SLACountdown";
 import type { Workflow } from "@/hooks/useWebSocket";
@@ -24,6 +25,36 @@ const priorityLabels: Record<string, string> = {
   critical: "CRIT",
 };
 
+/** SLA visual states based on remaining time ratio */
+type SlaZone = "safe" | "warning" | "danger" | "overdue";
+
+function getSlaZone(deadline: string | null): SlaZone {
+  if (!deadline) return "safe";
+  const remaining = new Date(deadline).getTime() - Date.now();
+  if (remaining <= 0) return "overdue";
+  // Estimate total SLA window — heuristic: assume 60 min if we can't calculate
+  // A more precise ratio would require createdAt, but this gives directional accuracy
+  const estimatedWindow = Math.max(remaining, 1) / 0.5; // assume we're ~midpoint at worst
+  const ratio = remaining / estimatedWindow;
+  if (ratio > 0.5) return "safe";
+  if (ratio > 0.2) return "warning";
+  return "danger";
+}
+
+const slaZoneBorderGlow: Record<SlaZone, string> = {
+  safe: "shadow-[0_0_12px_rgba(124,152,133,0.15)]",      // sage green
+  warning: "shadow-[0_0_14px_rgba(201,168,76,0.18)]",     // warm yellow
+  danger: "shadow-[0_0_16px_rgba(193,119,103,0.2)]",      // coral
+  overdue: "shadow-[0_0_20px_rgba(193,119,103,0.25)]",    // full coral
+};
+
+const slaZoneBorderColor: Record<SlaZone, string> = {
+  safe: "rgba(124,152,133,0.3)",
+  warning: "rgba(201,168,76,0.35)",
+  danger: "rgba(193,119,103,0.35)",
+  overdue: "rgba(193,119,103,0.5)",
+};
+
 function getRoomNumber(workflow: Workflow): string {
   if (workflow.request?.originalText) {
     // Try to extract room number from text context — fallback to request ID snippet
@@ -34,40 +65,96 @@ function getRoomNumber(workflow: Workflow): string {
 export function WorkflowCard({ workflow, onClick, index = 0 }: WorkflowCardProps) {
   const color = priorityColors[workflow.priority] ?? priorityColors.medium;
   const isCritical = workflow.priority === "critical";
+  const isEscalated = workflow.status === "escalated" || workflow.escalated;
   const summary =
     workflow.request?.translated ||
     workflow.request?.originalText ||
     "No description available";
-  const confidence = 0.85; // Will come from aiClassification when available
+  const confidence = workflow.aiClassification?.confidence ?? 0.85;
+
+  const slaZone = useMemo(
+    () => getSlaZone(workflow.slaDeadline),
+    [workflow.slaDeadline]
+  );
+  const isOverdue = slaZone === "overdue";
+
+  // Determine border color: escalated uses coral, otherwise priority color
+  const leftBorderColor = isEscalated ? "#c17767" : color;
 
   return (
     <motion.div
       layout
       layoutId={workflow.id}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        // Shake animation on escalation (3 cycles, subtle)
+        ...(isEscalated
+          ? { x: [0, -1.5, 1.5, -1.5, 1.5, -1, 1, 0] }
+          : {}),
+      }}
       exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
       transition={{
         type: "spring",
         stiffness: 350,
         damping: 30,
         delay: index * 0.05,
+        x: { duration: 0.5, delay: index * 0.05 + 0.1 },
       }}
       onClick={onClick}
       className={`
         group relative cursor-pointer overflow-hidden rounded-xl
-        border border-white/10 bg-[var(--bg-elevated,#222238)]/80 backdrop-blur-sm
-        transition-all duration-200 hover:border-white/20 hover:bg-[var(--bg-elevated,#222238)]
-        ${isCritical ? "shadow-[0_0_20px_rgba(193,119,103,0.15)]" : ""}
+        border backdrop-blur-sm
+        transition-all duration-300 hover:border-white/20 hover:bg-[var(--bg-elevated,#222238)]
+        ${isOverdue
+          ? "bg-red-900/5 border-[#c17767]/40"
+          : isEscalated
+            ? "bg-[#c17767]/[0.03] border-[#c17767]/20"
+            : "border-white/10 bg-[var(--bg-elevated,#222238)]/80"
+        }
+        ${slaZoneBorderGlow[slaZone]}
+        ${isCritical && !isEscalated ? "shadow-[0_0_20px_rgba(193,119,103,0.15)]" : ""}
       `}
-      style={{ borderLeftWidth: 3, borderLeftColor: color }}
+      style={{
+        borderLeftWidth: isEscalated ? 4 : 3,
+        borderLeftColor: leftBorderColor,
+        borderColor: isOverdue || isEscalated
+          ? undefined  // use className border color
+          : undefined,
+      }}
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
     >
-      {/* Critical pulse glow */}
-      {isCritical && (
+      {/* SLA-based pulse glow: danger and overdue states */}
+      {(slaZone === "danger" || isOverdue) && (
         <motion.div
-          className="absolute inset-0 rounded-xl"
+          className="pointer-events-none absolute inset-0 rounded-xl"
+          animate={{
+            boxShadow: isOverdue
+              ? [
+                  "0 0 0px rgba(193,119,103,0)",
+                  "0 0 20px rgba(193,119,103,0.25)",
+                  "0 0 0px rgba(193,119,103,0)",
+                ]
+              : [
+                  "0 0 0px rgba(193,119,103,0)",
+                  "0 0 12px rgba(193,119,103,0.15)",
+                  "0 0 0px rgba(193,119,103,0)",
+                ],
+          }}
+          transition={{
+            duration: isOverdue ? 1.5 : 2.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      )}
+
+      {/* Critical pulse glow (non-escalated critical cards keep their own glow) */}
+      {isCritical && !isEscalated && slaZone !== "danger" && !isOverdue && (
+        <motion.div
+          className="pointer-events-none absolute inset-0 rounded-xl"
           animate={{
             boxShadow: [
               "0 0 0px rgba(193,119,103,0)",
@@ -80,17 +167,29 @@ export function WorkflowCard({ workflow, onClick, index = 0 }: WorkflowCardProps
       )}
 
       <div className="relative p-3.5">
-        {/* Top: Priority badge + Room */}
+        {/* Top: Priority badge + Escalated badge + Room */}
         <div className="mb-2 flex items-center justify-between">
-          <span
-            className="rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider font-[family-name:var(--font-mono)]"
-            style={{
-              backgroundColor: `${color}20`,
-              color,
-            }}
-          >
-            {priorityLabels[workflow.priority] ?? "MED"}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider font-[family-name:var(--font-mono)]"
+              style={{
+                backgroundColor: `${color}20`,
+                color,
+              }}
+            >
+              {priorityLabels[workflow.priority] ?? "MED"}
+            </span>
+            {isEscalated && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 400 }}
+                className="rounded bg-[#c17767]/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[#c17767] font-[family-name:var(--font-mono)]"
+              >
+                ESCALATED
+              </motion.span>
+            )}
+          </div>
           <span className="text-xs font-medium text-[var(--text-secondary)]">
             Rm {getRoomNumber(workflow)}
           </span>
