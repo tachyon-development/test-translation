@@ -20,6 +20,9 @@ const app = new Elysia()
   .use(healthRoutes)
   .use(adminRoutes)
   .use(integrationRoutes)
-  .listen(Number(process.env.API_PORT) || 4000);
+  .listen({
+    port: Number(process.env.PORT) || Number(process.env.API_PORT) || 4000,
+    hostname: "0.0.0.0",
+  });
 
 console.log(`API running on port ${app.server?.port}`);
