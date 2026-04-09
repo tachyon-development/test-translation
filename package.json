@@ -8,6 +8,6 @@
     "db:migrate": "bun --filter @hospiq/db drizzle-kit migrate",
     "db:seed": "bun --filter @hospiq/db run seed",
     "db:push": "bun --filter @hospiq/db drizzle-kit push",
-    "test": "bun test --recursive"
+    "test": "bun test apps/api/src/__tests__ apps/worker/src/__tests__ packages/db/src/__tests__"
   }
 }
