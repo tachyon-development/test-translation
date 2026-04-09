@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { submitTextRequest } from "@/lib/api";
@@ -8,6 +8,7 @@ import { useSSE, type SSEEvent } from "@/hooks/useSSE";
 import { RoomSelector } from "@/components/kiosk/RoomSelector";
 import { ProgressStepper } from "@/components/kiosk/ProgressStepper";
 import { FeedbackPrompt } from "@/components/kiosk/FeedbackPrompt";
+import { Wifi, WifiOff, X } from "lucide-react";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -88,6 +89,67 @@ export default function KioskPage() {
   );
 }
 
+// Toast notification component
+function Toast({
+  message,
+  type = "error",
+  onDismiss,
+  onRetry,
+}: {
+  message: string;
+  type?: "error" | "info";
+  onDismiss: () => void;
+  onRetry?: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 40, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className={`
+        fixed bottom-6 left-1/2 z-50 -translate-x-1/2
+        flex items-center gap-3 rounded-xl border px-5 py-3 shadow-2xl backdrop-blur-xl
+        ${type === "error"
+          ? "border-[var(--status-danger,#c17767)]/20 bg-[var(--status-danger,#c17767)]/10 text-[var(--text-primary)]"
+          : "border-white/10 bg-white/5 text-[var(--text-primary)]"
+        }
+      `}
+    >
+      <span className="text-sm">{message}</span>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="whitespace-nowrap rounded-lg bg-[var(--accent,#d4a574)] px-3 py-1 text-xs font-medium text-[#1a1a2e] transition-colors hover:bg-[var(--accent,#d4a574)]/80"
+        >
+          Retry
+        </button>
+      )}
+      <button
+        onClick={onDismiss}
+        className="ml-1 rounded p-0.5 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </motion.div>
+  );
+}
+
+// SSE connection status badge for kiosk processing view
+function SSEConnectionBadge({ connected }: { connected: boolean }) {
+  if (connected) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-2 rounded-full border border-[var(--status-warning,#c9a84c)]/20 bg-[var(--status-warning,#c9a84c)]/10 px-3 py-1.5 text-xs text-[var(--status-warning,#c9a84c)]"
+    >
+      <WifiOff className="h-3 w-3 animate-pulse" />
+      Reconnecting...
+    </motion.div>
+  );
+}
+
 function KioskInner() {
   const searchParams = useSearchParams();
 
@@ -99,8 +161,22 @@ function KioskInner() {
   const [viewState, setViewState] = useState<ViewState>("input");
   const [currentStep, setCurrentStep] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
+  const [toast, setToast] = useState<{ message: string; retryable: boolean } | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { latestEvent } = useSSE(requestId);
+  const { latestEvent, connected: sseConnected } = useSSE(requestId);
+
+  // Auto-dismiss toast after 6 seconds
+  const showToast = useCallback((message: string, retryable = false) => {
+    setToast({ message, retryable });
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 6000);
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    setToast(null);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+  }, []);
 
   // Process SSE events
   useEffect(() => {
@@ -125,6 +201,15 @@ function KioskInner() {
     }
   }, [latestEvent]);
 
+  // Inline room validation on blur
+  const validateRoom = useCallback((value: string) => {
+    if (value && !/^\d{3}$/.test(value)) {
+      setRoomError("Please enter a 3-digit room number");
+    } else {
+      setRoomError("");
+    }
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     // Validate
     if (!/^\d{3}$/.test(room)) {
@@ -147,11 +232,11 @@ function KioskInner() {
       setCurrentStep(0);
       setStatusMessage("Your request has been received...");
     } catch {
-      setStatusMessage("Something went wrong. Please try again.");
+      showToast("Could not submit your request. Please check your connection and try again.", true);
     } finally {
       setSubmitting(false);
     }
-  }, [room, requestText]);
+  }, [room, requestText, showToast]);
 
   const handleReset = () => {
     setViewState("input");
@@ -207,7 +292,11 @@ function KioskInner() {
               </motion.div>
 
               {/* Room Selector */}
-              <RoomSelector value={room} onChange={setRoom} error={roomError} />
+              <RoomSelector
+                value={room}
+                onChange={(v) => { setRoom(v); if (roomError) validateRoom(v); }}
+                error={roomError}
+              />
 
               {/* Request Text Area */}
               <motion.div
@@ -294,6 +383,9 @@ function KioskInner() {
                   Room {room}
                 </p>
               </motion.div>
+
+              {/* SSE connection status */}
+              <SSEConnectionBadge connected={sseConnected} />
 
               {/* Progress Stepper */}
               <div className="flex w-full justify-center">
@@ -387,6 +479,18 @@ function KioskInner() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Error toast */}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type="error"
+            onDismiss={dismissToast}
+            onRetry={toast.retryable ? handleSubmit : undefined}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }

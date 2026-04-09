@@ -9,6 +9,7 @@ import { getUser, clearToken, isAuthenticated } from "@/lib/auth";
 import { ConnectionStatus } from "@/components/shared/ConnectionStatus";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { SkeletonKanban } from "@/components/shared/LoadingSkeleton";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { KanbanBoard } from "@/components/dashboard/KanbanBoard";
 import { WorkflowDetail } from "@/components/dashboard/WorkflowDetail";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
@@ -23,6 +24,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
+  Sparkles,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -130,12 +132,13 @@ export default function DashboardPage() {
     ? "reconnecting" as const
     : "disconnected" as const;
 
+  // Compute whether all queues are clear (connected, have loaded, but no active workflows)
+  const allClear =
+    connected &&
+    workflows.length === 0;
+
   if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent,#d4a574)] border-t-transparent" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -299,6 +302,24 @@ export default function DashboardPage() {
                   exit={{ opacity: 0 }}
                 >
                   <SkeletonKanban />
+                </motion.div>
+              ) : allClear ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-1 flex-col items-center justify-center py-24 text-center"
+                >
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--status-success,#7c9885)]/10">
+                    <Sparkles className="h-7 w-7 text-[var(--status-success,#7c9885)]" />
+                  </div>
+                  <h3 className="font-display mb-2 text-xl font-semibold text-[var(--text-primary)]">
+                    All clear — no pending requests
+                  </h3>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Your department is caught up. Nice work.
+                  </p>
                 </motion.div>
               ) : (
                 <motion.div
