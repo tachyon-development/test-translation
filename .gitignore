@@ -8,3 +8,4 @@ bun.lockb
 *.tsbuildinfo
 drizzle/meta/
 apps/frontend/test-results/
+.vercel
