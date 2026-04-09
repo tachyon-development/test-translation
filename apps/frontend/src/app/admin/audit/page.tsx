@@ -34,9 +34,10 @@ interface AuditEntry {
 
 interface AuditResponse {
   data: AuditEntry[];
-  total: number;
-  page: number;
-  limit: number;
+  total?: number;
+  page?: number;
+  limit?: number;
+  pagination?: { total: number; page: number; limit: number; totalPages: number };
 }
 
 const LIMIT = 50;
@@ -88,7 +89,7 @@ export default function AuditLogPage() {
           setTotal(raw.length);
         } else {
           setEntries(raw.data);
-          setTotal(raw.total);
+          setTotal(raw.pagination?.total ?? raw.total ?? raw.data.length);
         }
       } catch {
         setEntries([]);
