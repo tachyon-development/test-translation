@@ -6,7 +6,7 @@ test.describe('Staff Flow', () => {
     await staffPage.waitForLoadState('networkidle');
     // Assert kanban visible
     await expect(
-      staffPage.locator('text=Pending').or(staffPage.locator('text=Claimed'))
+      staffPage.getByRole('heading', { name: 'Pending' })
     ).toBeVisible({ timeout: 10000 });
   });
 

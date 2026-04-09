@@ -20,9 +20,7 @@ test.describe('Analytics', () => {
     await managerPage.goto('/analytics');
     await managerPage.waitForLoadState('networkidle');
     await expect(
-      managerPage
-        .locator('text=PostgreSQL')
-        .or(managerPage.locator('text=Redis'))
+      managerPage.getByText('PostgreSQL')
     ).toBeVisible({ timeout: 10000 });
   });
 });
