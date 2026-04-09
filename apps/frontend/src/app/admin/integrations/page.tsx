@@ -96,10 +96,10 @@ export default function IntegrationsPage() {
     const token = getToken();
     if (!token) return;
     try {
-      const data = await apiRequest<Integration[]>("/api/integrations", {
+      const raw = await apiRequest<Integration[] | { data: Integration[] }>("/api/integrations", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setIntegrations(data);
+      setIntegrations(Array.isArray(raw) ? raw : raw.data);
     } catch {
       // Failed
     } finally {
