@@ -1,31 +1,31 @@
 graph TB
     subgraph External["External Clients"]
-        GK["🏨 Guest Kiosk / Mobile<br/><i>Guests submit requests via<br/>voice or text in any language</i>"]
-        SD["📋 Staff Dashboard<br/><i>Hotel staff claim & resolve<br/>requests in real-time</i>"]
-        MD["📊 Manager Dashboard<br/><i>Operations analytics, SLA<br/>monitoring & escalation</i>"]
-        AD["⚙️ Admin Panel<br/><i>Configure departments, users,<br/>rooms & integrations</i>"]
+        GK["Guest Kiosk / Mobile<br/><i>Guests submit requests via<br/>voice or text in any language</i>"]
+        SD["Staff Dashboard<br/><i>Hotel staff claim & resolve<br/>requests in real-time</i>"]
+        MD["Manager Dashboard<br/><i>Operations analytics, SLA<br/>monitoring & escalation</i>"]
+        AD["Admin Panel<br/><i>Configure departments, users,<br/>rooms & integrations</i>"]
     end
 
     subgraph Cloud["Cloud AI Services"]
-        GROQ["🧠 Groq Cloud API<br/>llama-3.1-8b-instant<br/><i>~500ms classification — translates any<br/>language to English, detects department<br/>(maintenance/kitchen/etc) & urgency level</i>"]
+        GROQ["Groq Cloud API<br/>llama-3.1-8b-instant<br/><i>~500ms classification — translates any<br/>language to English, detects department<br/>(maintenance/kitchen/etc) & urgency level</i>"]
     end
 
     subgraph Vercel["Vercel — Frontend Hosting"]
-        FE["⚡ Next.js Frontend<br/>shadcn/ui + D3.js + framer-motion<br/><i>Server-rendered pages, edge CDN,<br/>zero-config deployment. Serves all<br/>4 user interfaces from one app.</i>"]
+        FE["Next.js Frontend<br/>shadcn/ui + D3.js + framer-motion<br/><i>Server-rendered pages, edge CDN,<br/>zero-config deployment. Serves all<br/>4 user interfaces from one app.</i>"]
     end
 
     subgraph Railway["Railway — Backend Infrastructure"]
-        API["🔌 Elysia API Server<br/>Bun runtime, port 4000<br/><i>REST endpoints + WebSocket (staff real-time)<br/>+ SSE (guest progress). Stateless — handles<br/>auth, routing, CRUD. Doesn't do AI work.</i>"]
+        API["Elysia API Server<br/>Bun runtime, port 4000<br/><i>REST endpoints + WebSocket (staff real-time)<br/>+ SSE (guest progress). Stateless — handles<br/>auth, routing, CRUD. Doesn't do AI work.</i>"]
 
-        WK["⚙️ BullMQ Workers ×2<br/>Bun runtime<br/><i>Background job processors. Picks up<br/>transcription & classification jobs from<br/>Redis queue. Calls Whisper & Groq/Ollama.<br/>Creates workflows & publishes events.</i>"]
+        WK["BullMQ Workers ×2<br/>Bun runtime<br/><i>Background job processors. Picks up<br/>transcription & classification jobs from<br/>Redis queue. Calls Whisper & Groq/Ollama.<br/>Creates workflows & publishes events.</i>"]
 
-        WH["🎤 Whisper (faster-whisper-server)<br/>CPU inference, port 8000<br/><i>Speech-to-text. Converts voice recordings<br/>to text in any language. Needed because<br/>guests speak Mandarin, Spanish, Japanese<br/>etc — must transcribe before classifying.</i>"]
+        WH["Whisper (faster-whisper-server)<br/>CPU inference, port 8000<br/><i>Speech-to-text. Converts voice recordings<br/>to text in any language. Needed because<br/>guests speak Mandarin, Spanish, Japanese<br/>etc — must transcribe before classifying.</i>"]
 
-        OL["🦙 Ollama (llama3 fallback)<br/>CPU inference, port 11434<br/><i>Local LLM fallback when Groq is down.<br/>Circuit breaker pattern: Groq fails 3x →<br/>falls back to Ollama → fails again →<br/>manual review by staff.</i>"]
+        OL["Ollama (llama3 fallback)<br/>CPU inference, port 11434<br/><i>Local LLM fallback when Groq is down.<br/>Circuit breaker pattern: Groq fails 3x →<br/>falls back to Ollama → fails again →<br/>manual review by staff.</i>"]
 
-        PG["🗄️ PostgreSQL 16<br/>Primary database<br/><i>All persistent data: users, departments,<br/>requests, workflows, events, audit log.<br/>Row Level Security ensures tenants<br/>can never see each other's data.</i>"]
+        PG["PostgreSQL 16<br/>Primary database<br/><i>All persistent data: users, departments,<br/>requests, workflows, events, audit log.<br/>Row Level Security ensures tenants<br/>can never see each other's data.</i>"]
 
-        RD["⚡ Redis 7<br/>4 roles in one service<br/><i>1) Job Queue — BullMQ stores pending<br/>transcription/classification jobs<br/>2) Pub/Sub — pushes real-time events<br/>to WebSocket & SSE connections<br/>3) Cache — dashboard KPIs (10s TTL)<br/>4) Timers — delayed SLA escalation jobs</i>"]
+        RD["Redis 7<br/>4 roles in one service<br/><i>1) Job Queue — BullMQ stores pending<br/>transcription/classification jobs<br/>2) Pub/Sub — pushes real-time events<br/>to WebSocket & SSE connections<br/>3) Cache — dashboard KPIs (10s TTL)<br/>4) Timers — delayed SLA escalation jobs</i>"]
     end
 
     GK -->|"HTTPS"| FE
