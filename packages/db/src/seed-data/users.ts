@@ -1,0 +1,118 @@
+import type { Database } from "../index";
+import { schema } from "../index";
+import { ORG_ID, DEPT_IDS, USER_IDS } from "./ids";
+
+export async function seedUsers(db: Database) {
+  const passwordHash = await Bun.password.hash("demo2026");
+
+  await db.insert(schema.users).values([
+    {
+      id: USER_IDS[1],
+      orgId: ORG_ID,
+      name: "Demo Guest",
+      role: "guest",
+      departmentId: null,
+      email: "guest@demo.hospiq.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[2],
+      orgId: ORG_ID,
+      name: "Anonymous Guest",
+      role: "guest",
+      departmentId: null,
+      email: "anon@demo.hospiq.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[3],
+      orgId: ORG_ID,
+      name: "Juan Hernandez",
+      role: "staff",
+      departmentId: DEPT_IDS.maintenance,
+      email: "juan@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[4],
+      orgId: ORG_ID,
+      name: "Pedro Santos",
+      role: "staff",
+      departmentId: DEPT_IDS.maintenance,
+      email: "pedro@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[5],
+      orgId: ORG_ID,
+      name: "Ana Garcia",
+      role: "staff",
+      departmentId: DEPT_IDS.housekeeping,
+      email: "ana@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[6],
+      orgId: ORG_ID,
+      name: "Lisa Chen",
+      role: "staff",
+      departmentId: DEPT_IDS.housekeeping,
+      email: "lisa@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[7],
+      orgId: ORG_ID,
+      name: "Sophie Dubois",
+      role: "staff",
+      departmentId: DEPT_IDS.concierge,
+      email: "sophie@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[8],
+      orgId: ORG_ID,
+      name: "James Wilson",
+      role: "staff",
+      departmentId: DEPT_IDS.frontDesk,
+      email: "james@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[9],
+      orgId: ORG_ID,
+      name: "Yuki Tanaka",
+      role: "staff",
+      departmentId: DEPT_IDS.kitchen,
+      email: "yuki@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[10],
+      orgId: ORG_ID,
+      name: "Maria Torres",
+      role: "manager",
+      departmentId: null,
+      email: "maria@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[11],
+      orgId: ORG_ID,
+      name: "Carlos Rivera",
+      role: "manager",
+      departmentId: DEPT_IDS.kitchen,
+      email: "carlos@hotel-mariana.com",
+      passwordHash,
+    },
+    {
+      id: USER_IDS[12],
+      orgId: ORG_ID,
+      name: "Admin",
+      role: "admin",
+      departmentId: null,
+      email: "admin@hotel-mariana.com",
+      passwordHash,
+    },
+  ]);
+}
