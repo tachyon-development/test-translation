@@ -57,7 +57,7 @@ async function loginAs(
   let lastError: string = '';
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const res = await request.post('http://localhost:80/api/auth/login', {
+      const res = await request.post('https://hospiq-api-production.up.railway.app/api/auth/login', {
         data: { email, password },
         headers: { 'Content-Type': 'application/json' },
       });
@@ -91,7 +91,7 @@ async function authenticatedContext(
     recordVideo: { dir: 'test-results/scenarios/', size: { width: 1280, height: 800 } },
   });
   const page = await ctx.newPage();
-  await page.goto('http://localhost/');
+  await page.goto('https://hospiq-eight.vercel.app/');
   await page.evaluate((t: string) => localStorage.setItem('hospiq_token', t), token);
   return { ctx, page };
 }
@@ -122,7 +122,7 @@ test.describe('Demo Scenario Recordings', () => {
       recordVideo: { dir: 'test-results/scenarios/', size: { width: 1280, height: 800 } },
     });
     const staffPage = await staffCtx.newPage();
-    await staffPage.goto('http://localhost/');
+    await staffPage.goto('https://hospiq-eight.vercel.app/');
     await staffPage.evaluate((t: string) => localStorage.setItem('hospiq_token', t), staffToken);
 
     // Guest context
@@ -133,39 +133,39 @@ test.describe('Demo Scenario Recordings', () => {
     const guestPage = await guestCtx.newPage();
 
     // Staff: open dashboard
-    await staffPage.goto('http://localhost/dashboard');
+    await staffPage.goto('https://hospiq-eight.vercel.app/dashboard');
     await staffPage.waitForLoadState('networkidle');
     await showOverlay(staffPage, 'STAFF DASHBOARD \u2014 Watching in real-time');
     await staffPage.waitForTimeout(3000);
 
     // Guest: open kiosk
-    await guestPage.goto('http://localhost/');
+    await guestPage.goto('https://hospiq-eight.vercel.app/');
     await guestPage.waitForLoadState('networkidle');
-    await showOverlay(guestPage, 'GUEST KIOSK \u2014 Submitting a request');
+    await showOverlay(guestPage, 'GUEST \u2014 Submitting request');
     await guestPage.waitForTimeout(2000);
 
     // Guest: fill form
     await guestPage.fill('[data-testid="room-input"]', '412');
-    await guestPage.fill('[data-testid="request-input"]', 'My faucet is leaking badly - please help!');
+    await guestPage.fill('[data-testid="request-input"]', 'My faucet is leaking badly');
     await guestPage.waitForTimeout(1500);
 
     // Guest: submit
-    await showOverlay(guestPage, 'Request submitted...', SAGE);
+    await showOverlay(guestPage, 'GUEST \u2014 Submitting request', SAGE);
     await guestPage.click('[data-testid="submit-button"]');
     await guestPage.waitForTimeout(2000);
 
     // Show AI classifying
-    await showOverlay(guestPage, 'AI classifying...', GOLD);
-    await showOverlay(staffPage, 'AI classifying the request...', GOLD);
-    await guestPage.waitForTimeout(3000);
+    await showOverlay(guestPage, 'AI classifying via Groq (~5s)', GOLD);
+    await showOverlay(staffPage, 'AI classifying via Groq (~5s)', GOLD);
+    await guestPage.waitForTimeout(5000);
 
     // Show routing
     await showOverlay(guestPage, 'Routed to Maintenance', SAGE);
-    await showOverlay(staffPage, 'Routed to Maintenance', SAGE);
+    await showOverlay(staffPage, 'STAFF \u2014 New workflow appeared!', SAGE);
     await staffPage.waitForTimeout(3000);
 
     // Final state
-    await showOverlay(staffPage, 'New card appeared!', SAGE);
+    await showOverlay(staffPage, 'STAFF \u2014 New workflow appeared!', SAGE);
     await staffPage.waitForTimeout(3000);
 
     // Cleanup
@@ -183,7 +183,7 @@ test.describe('Demo Scenario Recordings', () => {
 
     const { ctx, page } = await authenticatedContext(browser, request, 'juan@hotel-mariana.com');
 
-    await page.goto('http://localhost/dashboard');
+    await page.goto('https://hospiq-eight.vercel.app/dashboard');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'STAFF \u2014 Claiming a workflow');
     await page.waitForTimeout(3000);
@@ -224,7 +224,7 @@ test.describe('Demo Scenario Recordings', () => {
 
     const { ctx, page } = await authenticatedContext(browser, request, 'maria@hotel-mariana.com');
 
-    await page.goto('http://localhost/analytics');
+    await page.goto('https://hospiq-eight.vercel.app/analytics');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'MANAGER \u2014 Analytics Command Center');
     await page.waitForTimeout(4000);
@@ -258,7 +258,7 @@ test.describe('Demo Scenario Recordings', () => {
 
     const { ctx, page } = await authenticatedContext(browser, request, 'maria@hotel-mariana.com');
 
-    await page.goto('http://localhost/manager');
+    await page.goto('https://hospiq-eight.vercel.app/manager');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'ESCALATION CENTER \u2014 SLA breaches requiring attention', CORAL);
     await page.waitForTimeout(4000);
@@ -289,7 +289,7 @@ test.describe('Demo Scenario Recordings', () => {
     });
     const page = await ctx.newPage();
 
-    await page.goto('http://localhost/demo');
+    await page.goto('https://hospiq-eight.vercel.app/demo');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'HospiQ \u2014 Choose a role to explore');
     await page.waitForTimeout(5000);
@@ -315,19 +315,19 @@ test.describe('Demo Scenario Recordings', () => {
 
     const { ctx, page } = await authenticatedContext(browser, request, 'admin@hotel-mariana.com');
 
-    await page.goto('http://localhost/admin');
+    await page.goto('https://hospiq-eight.vercel.app/admin');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'ADMIN \u2014 Departments, Users, Rooms, Integrations');
     await page.waitForTimeout(4000);
 
     // Navigate to departments
-    await page.goto('http://localhost/admin/departments');
+    await page.goto('https://hospiq-eight.vercel.app/admin/departments');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'Department Management \u2014 SLA targets + escalation rules');
     await page.waitForTimeout(4000);
 
     // Navigate to rooms
-    await page.goto('http://localhost/admin/rooms');
+    await page.goto('https://hospiq-eight.vercel.app/admin/rooms');
     await page.waitForLoadState('networkidle');
     await showOverlay(page, 'Room Directory \u2014 Floor plans + QR code mapping');
     await page.waitForTimeout(4000);

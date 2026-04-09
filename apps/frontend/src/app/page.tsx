@@ -255,25 +255,33 @@ function KioskInner() {
 
   const handleVoiceComplete = useCallback(
     async (audioBlob: Blob) => {
-      if (!/^\d{3}$/.test(room)) {
-        setRoomError("Please enter a 3-digit room number");
-        return;
-      }
-
       setSubmitting(true);
 
       try {
-        const { request_id } = await submitVoiceRequest({
-          audio: audioBlob,
-          room_number: room,
-          org_id: ORG_ID,
+        // Send audio to Whisper for transcription only — don't auto-submit
+        const formData = new FormData();
+        formData.append("audio", audioBlob, "recording.webm");
+        formData.append("room_number", room || "101");
+        formData.append("org_id", ORG_ID);
+
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+        const res = await fetch(`${API_BASE}/api/requests/voice`, {
+          method: "POST",
+          body: formData,
         });
-        setRequestId(request_id);
-        setViewState("processing");
-        setCurrentStep(0);
-        setStatusMessage("Transcribing your request...");
+
+        if (res.ok) {
+          const { request_id } = await res.json();
+          // Start listening for transcription result via SSE
+          setRequestId(request_id);
+          setViewState("processing");
+          setCurrentStep(0);
+          setStatusMessage("Transcribing your voice...");
+        } else {
+          showToast("Could not process your voice. Please type your request instead.", true);
+        }
       } catch {
-        showToast("Could not submit your voice request. Please try again.", true);
+        showToast("Could not process your voice. Please type your request instead.", true);
       } finally {
         setSubmitting(false);
       }
