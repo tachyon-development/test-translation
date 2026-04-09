@@ -124,10 +124,55 @@ Justifications for every major technology choice in HospiQ, including the trade-
 
 ---
 
-## Testing: Playwright
+## Unit Testing: Bun Test Runner
 
-**What:** Runs end-to-end tests that simulate the full guest-to-staff workflow — submitting a request, watching it flow through classification, verifying the staff dashboard updates via WebSocket, and confirming SLA escalation behavior — all against a Docker Compose environment with real services.
+**What:** 98 unit tests across all three packages, running in ~370ms with zero external dependencies. Covers:
+- **API:** JWT sign/verify/tamper detection (7 tests), circuit breaker state machine with in-memory Redis mock (9 tests), field mapping transforms including dot-notation resolution, uppercase, truncate, prefix, map, and iso639 (21 tests)
+- **Worker:** Classification prompt structure and content verification (10 tests), fuzzy department matching across all 5 strategies — exact name, slug, slug-contains, name-contains, first-word (14 tests)
+- **DB:** Schema export verification for all 14 tables, 9 enum types, and relation definitions (28 tests), seed ID determinism, UUID format, and uniqueness across all entity sets (9 tests)
 
-**Why:** Cross-browser E2E testing that can validate the real-time WebSocket and SSE flows that unit tests cannot cover. Playwright's auto-wait and network interception make async UI testing reliable.
+**Why:** Bun's built-in test runner (`bun:test`) provides Jest-compatible syntax with zero configuration and near-instant startup. Tests run without Docker, databases, or any external services — pure logic verification. The `matchDepartment` function was extracted into its own module specifically to enable thorough testing of the fuzzy matching logic that routes requests to the correct hotel department.
 
-**Trade-off:** Slower than unit/integration tests and requires the full Docker stack running. Mitigated by running Playwright only in CI and using Vitest for fast unit/integration coverage locally.
+**Trade-off:** No test coverage for database queries or Redis interactions at the unit level — those are validated by the E2E tests. Unit tests focus on pure business logic (classification prompts, department matching, field transforms, auth tokens, circuit breaker state) where fast feedback matters most.
+
+**Run:** `bun test apps/api/src/__tests__ apps/worker/src/__tests__ packages/db/src/__tests__`
+
+---
+
+## E2E Testing: Playwright
+
+**What:** 18 end-to-end tests across 8 test suites that simulate real user workflows against the full running application:
+- **Guest flow** (3 tests): Submit text request, room pre-fill via URL param, graceful error on network failure
+- **Staff flow** (3 tests): View kanban dashboard, claim a workflow, filter by department
+- **Real-time sync** (1 test): Two browser contexts — guest submits a request, staff dashboard receives it via WebSocket within 15 seconds (the "killer test")
+- **Escalation** (2 tests): Manager sees escalated workflows, override AI classification
+- **Fault tolerance** (1 test): System handles AI service unavailability gracefully
+- **Analytics** (3 tests): KPI cards render, D3 SVG charts present, system health indicators
+- **Admin** (3 tests): View departments, audit log, rooms
+- **Demo simulation** (2 tests): Role selection buttons, guest navigation
+
+Custom test fixtures provide pre-authenticated pages per role (staff, manager, admin, guest) with retry logic for API availability.
+
+**Why:** Cross-browser E2E testing validates the real-time WebSocket and SSE flows that unit tests cannot cover. Playwright's auto-wait and network interception make async UI testing reliable. The two-context real-time sync test proves the entire pipeline works: guest submission → Redis queue → Groq classification → workflow creation → Redis pub/sub → WebSocket push → dashboard update.
+
+**Trade-off:** Slower than unit tests (~2 minutes vs 370ms) and requires the full stack running (Docker locally or production deployment). Mitigated by running Playwright separately from unit tests, with `retries: 1` for flaky network conditions.
+
+**Run locally:** `cd apps/frontend && npx playwright test`
+**Run against production:** Tests auto-detect the running stack via `webServer` config.
+
+---
+
+## Demo Recordings: Playwright + ffmpeg
+
+**What:** 5 side-by-side video clips recorded via Playwright's video capture, stitched with ffmpeg, showcasing the application against the live production deployment:
+1. Multi-language AI classification (Mandarin guest → staff sees translated card)
+2. Real-time WebSocket flow (guest submits → staff dashboard updates live)
+3. Staff claims and resolves (guest stepper updates in parallel)
+4. Manager analytics + escalation center (D3 charts alongside SLA breach monitoring)
+5. Demo landing + admin settings (role selection alongside department configuration)
+
+Each clip injects on-screen text overlay banners via `page.evaluate()` to annotate what's happening.
+
+**Why:** Video evidence of real-time features is more compelling than screenshots. Side-by-side format shows cause-and-effect (guest action → staff reaction) which static docs cannot convey. Recordings run against production to prove the deployed system works end-to-end.
+
+**Trade-off:** Video files add ~4MB to the repo. Justified as demo assets for judges/stakeholders. Can be regenerated anytime with `npx playwright test e2e/record-feature-clips.spec.ts --workers=1`.
