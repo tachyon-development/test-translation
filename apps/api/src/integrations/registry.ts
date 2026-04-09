@@ -19,28 +19,35 @@ export interface IntegrationAdapter {
   ): Promise<{ status: number; body: any }>;
 }
 
-const adapters: Record<string, IntegrationAdapter> = {};
+const adapters = new Map<string, IntegrationAdapter>();
 
 export function registerAdapter(
   provider: string,
   adapter: IntegrationAdapter,
 ): void {
-  adapters[provider] = adapter;
+  adapters.set(provider, adapter);
 }
 
 export function getAdapter(
   provider: string,
 ): IntegrationAdapter | undefined {
-  return adapters[provider];
+  ensureLoaded();
+  return adapters.get(provider);
 }
 
 export function listAdapters(): string[] {
-  return Object.keys(adapters);
+  ensureLoaded();
+  return Array.from(adapters.keys());
 }
 
-// Register all adapters on import
-import "./adapters/webhook";
-import "./adapters/opera";
-import "./adapters/slack";
-import "./adapters/mews";
-import "./adapters/jira";
+let loaded = false;
+function ensureLoaded() {
+  if (loaded) return;
+  loaded = true;
+  // Lazy-load adapters to avoid circular init
+  require("./adapters/webhook");
+  require("./adapters/opera");
+  require("./adapters/slack");
+  require("./adapters/mews");
+  require("./adapters/jira");
+}
