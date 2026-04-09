@@ -15,8 +15,12 @@ import {
   CircuitOpenError,
 } from "../../../api/src/lib/circuitBreaker";
 
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+// Fallback to Ollama if no Groq key
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://ollama:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3";
+const USE_GROQ = !!GROQ_API_KEY;
 
 interface ClassificationJob {
   requestId: string;
@@ -76,30 +80,49 @@ export function createClassificationWorker() {
 
       const deptNames = departments.map((d) => d.name);
 
-      // 4. Call Ollama (wrapped in circuit breaker)
+      // 4. Call AI for classification (Groq or Ollama fallback)
       const prompt = buildClassifyPrompt(text, deptNames);
 
-      let ollamaData: { response: string };
+      let aiResponseText: string;
       try {
-        ollamaData = await ollamaBreaker.execute(async () => {
-          const ollamaRes = await fetch(`${OLLAMA_URL}/api/generate`, {
+        if (USE_GROQ) {
+          // Groq — fast cloud inference via OpenAI-compatible API
+          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${GROQ_API_KEY}`,
+            },
             body: JSON.stringify({
-              model: OLLAMA_MODEL,
-              prompt,
-              stream: false,
+              model: GROQ_MODEL,
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.1,
+              max_tokens: 256,
             }),
           });
 
-          if (!ollamaRes.ok) {
-            throw new Error(
-              `Ollama request failed: ${ollamaRes.status} ${await ollamaRes.text()}`,
-            );
+          if (!groqRes.ok) {
+            throw new Error(`Groq request failed: ${groqRes.status} ${await groqRes.text()}`);
           }
 
-          return (await ollamaRes.json()) as { response: string };
-        });
+          const groqData = await groqRes.json() as { choices: { message: { content: string } }[] };
+          aiResponseText = groqData.choices[0]?.message?.content || "";
+          console.log(`Groq classified in ~${groqRes.headers.get("x-groq-latency") || "?"}ms`);
+        } else {
+          // Ollama fallback (wrapped in circuit breaker)
+          const ollamaData = await ollamaBreaker.execute(async () => {
+            const ollamaRes = await fetch(`${OLLAMA_URL}/api/generate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false }),
+            });
+            if (!ollamaRes.ok) {
+              throw new Error(`Ollama request failed: ${ollamaRes.status} ${await ollamaRes.text()}`);
+            }
+            return (await ollamaRes.json()) as { response: string };
+          });
+          aiResponseText = ollamaData.response;
+        }
       } catch (error) {
         if (error instanceof CircuitOpenError) {
           console.warn(
@@ -157,10 +180,10 @@ export function createClassificationWorker() {
       }
 
       // 5. Parse JSON response
-      const jsonMatch = ollamaData.response.match(/\{[\s\S]*\}/);
+      const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error(
-          `Failed to parse Ollama response as JSON: ${ollamaData.response}`,
+          `Failed to parse AI response as JSON: ${aiResponseText}`,
         );
       }
 

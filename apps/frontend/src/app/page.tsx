@@ -162,6 +162,10 @@ function KioskInner() {
   const [viewState, setViewState] = useState<ViewState>("input");
   const [currentStep, setCurrentStep] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [translatedText, setTranslatedText] = useState("");
+  const [detectedLang, setDetectedLang] = useState("");
+  const [department, setDepartment] = useState("");
   const [toast, setToast] = useState<{ message: string; retryable: boolean } | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -188,17 +192,30 @@ function KioskInner() {
       setCurrentStep(step);
     }
 
+    // Capture transcript from Whisper
+    if (latestEvent.type === "transcribed" && latestEvent.text) {
+      setTranscript(latestEvent.text as string);
+      if (latestEvent.lang) setDetectedLang(latestEvent.lang as string);
+      setStatusMessage("Transcribed! Now understanding your request...");
+    }
+
+    // Capture classification details
+    if (latestEvent.type === "classified" || latestEvent.type === "routed") {
+      if (latestEvent.department) setDepartment(latestEvent.department as string);
+      if (latestEvent.summary) setTranslatedText(latestEvent.summary as string);
+    }
+
+    if (latestEvent.type === "routed") {
+      setStatusMessage(`Routed to ${latestEvent.department || "the right team"}. Help is on the way!`);
+    }
+
     if (latestEvent.message) {
       setStatusMessage(latestEvent.message as string);
     }
 
     if (latestEvent.type === "resolved") {
       setViewState("resolved");
-      if (latestEvent.message) {
-        setStatusMessage(latestEvent.message as string);
-      } else {
-        setStatusMessage("Your request has been fulfilled. Thank you.");
-      }
+      setStatusMessage(latestEvent.message as string || "Your request has been fulfilled. Thank you.");
     }
   }, [latestEvent]);
 
@@ -446,19 +463,52 @@ function KioskInner() {
                 <ProgressStepper currentStep={currentStep} steps={STEPS} />
               </div>
 
-              {/* Status message with typewriter effect */}
-              {statusMessage && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="rounded-xl border border-white/5 bg-white/[0.03] px-6 py-4 text-center backdrop-blur-xl"
-                >
-                  <TypewriterText
-                    text={statusMessage}
-                    className="font-mono text-sm text-[var(--text-secondary)]"
-                  />
-                </motion.div>
-              )}
+              {/* Live details panel */}
+              <div className="w-full space-y-3">
+                {/* Transcript */}
+                {transcript && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-white/5 bg-white/[0.03] px-5 py-3 backdrop-blur-xl"
+                  >
+                    <p className="mb-1 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
+                      Transcribed {detectedLang ? `(${detectedLang})` : ""}
+                    </p>
+                    <p className="font-mono text-sm text-[var(--text-primary)]">&ldquo;{transcript}&rdquo;</p>
+                  </motion.div>
+                )}
+
+                {/* Translation / Classification */}
+                {department && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-5 py-3 backdrop-blur-xl"
+                  >
+                    <p className="mb-1 text-xs uppercase tracking-wider text-[var(--accent)]">
+                      Routed to {department}
+                    </p>
+                    {translatedText && (
+                      <p className="text-sm text-[var(--text-secondary)]">{translatedText}</p>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Status message */}
+                {statusMessage && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="rounded-xl border border-white/5 bg-white/[0.03] px-5 py-3 text-center backdrop-blur-xl"
+                  >
+                    <TypewriterText
+                      text={statusMessage}
+                      className="font-mono text-sm text-[var(--text-secondary)]"
+                    />
+                  </motion.div>
+                )}
+              </div>
             </motion.div>
           )}
 
