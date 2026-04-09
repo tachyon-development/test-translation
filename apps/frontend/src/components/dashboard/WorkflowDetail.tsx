@@ -375,7 +375,7 @@ export function WorkflowDetail({
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2">
-                {workflow.status === "pending" && (
+                {(workflow.status === "pending" || workflow.status === "escalated") && (
                   <Button
                     size="sm"
                     onClick={() => handleAction("claim")}
@@ -407,7 +407,7 @@ export function WorkflowDetail({
                   </Button>
                 )}
 
-                {(workflow.status === "claimed" || workflow.status === "in_progress") && (
+                {(workflow.status === "claimed" || workflow.status === "in_progress" || workflow.status === "escalated") && (
                   <Button
                     size="sm"
                     onClick={() => handleAction("resolve")}

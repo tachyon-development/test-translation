@@ -1,15 +1,15 @@
 /**
- * HospiQ Feature Demo Clips
+ * HospiQ Feature Demo Clips — Side-by-Side Edition
  *
- * Records 7 independent feature clips with text overlays,
- * then concatenates them into a master demo video.
+ * Every clip uses TWO browser contexts (640x720 each) recorded with video,
+ * then stitched side-by-side via ffmpeg into a 1280x720 MP4.
  *
  * Run: npx playwright test e2e/record-feature-clips.spec.ts --workers=1
- * Output: docs/clips/clip-*.mp4 + docs/demo-complete.mp4
+ * Output: docs/clips/clip-N-name.mp4 + docs/clips/demo-complete.mp4
  */
 import { test, type Page, type APIRequestContext, type BrowserContext } from '@playwright/test';
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ async function showOverlay(page: Page, text: string, color: string = GOLD) {
       overlay.style.cssText = `
         position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
         color: #0f0f17; font-family: 'DM Sans', sans-serif;
-        font-size: 18px; font-weight: 700; text-align: center; padding: 10px 16px;
+        font-size: 16px; font-weight: 700; text-align: center; padding: 10px 16px;
         letter-spacing: 1px; text-transform: uppercase;
       `;
       document.body.appendChild(overlay);
@@ -83,47 +83,50 @@ async function loginAs(request: APIRequestContext, email: string): Promise<strin
   throw new Error(`Failed to login as ${email}: ${lastError}`);
 }
 
-async function authenticatedContext(
+// ---------------------------------------------------------------------------
+// Side-by-side context pair helper
+// ---------------------------------------------------------------------------
+
+interface ContextPair {
+  leftCtx: BrowserContext;
+  rightCtx: BrowserContext;
+  leftPage: Page;
+  rightPage: Page;
+}
+
+async function createSideBySidePair(
   browser: import('@playwright/test').Browser,
-  request: APIRequestContext,
-  email: string,
-  opts?: { width?: number; height?: number },
-): Promise<{ ctx: BrowserContext; page: Page; token: string }> {
-  const token = await loginAs(request, email);
-  const w = opts?.width ?? 1280;
-  const h = opts?.height ?? 800;
-  const ctx = await browser.newContext({
-    viewport: { width: w, height: h },
-    recordVideo: { dir: RAW_DIR, size: { width: w, height: h } },
+): Promise<ContextPair> {
+  const leftCtx = await browser.newContext({
+    viewport: { width: 640, height: 720 },
+    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
   });
-  const page = await ctx.newPage();
+  const rightCtx = await browser.newContext({
+    viewport: { width: 640, height: 720 },
+    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
+  });
+  const leftPage = await leftCtx.newPage();
+  const rightPage = await rightCtx.newPage();
+  return { leftCtx, rightCtx, leftPage, rightPage };
+}
+
+async function authenticatePage(page: Page, token: string, path: string) {
   await page.goto(`${PROD_URL}/`);
   await page.evaluate((t: string) => localStorage.setItem('hospiq_token', t), token);
-  return { ctx, page, token };
+  await page.goto(`${PROD_URL}${path}`);
+  await page.waitForLoadState('networkidle');
 }
 
 // ---------------------------------------------------------------------------
-// ffmpeg helpers
+// ffmpeg stitch helper
 // ---------------------------------------------------------------------------
 
-function renameVideo(rawPath: string | undefined, destPath: string, maxDuration?: number) {
-  if (!rawPath || !existsSync(rawPath)) {
-    console.warn(`Video not found: ${rawPath}`);
-    return;
-  }
-  try {
-    const durationFlag = maxDuration ? `-t ${maxDuration}` : '';
-    execSync(
-      `ffmpeg -y -i "${rawPath}" ${durationFlag} -r 15 -c:v libx264 -preset fast -crf 23 "${destPath}"`,
-      { stdio: 'pipe', timeout: 60000 },
-    );
-    console.log(`Saved: ${destPath}`);
-  } catch (e) {
-    console.error(`ffmpeg rename failed for ${destPath}:`, e);
-  }
-}
-
-function stitchSideBySide(leftPath: string | undefined, rightPath: string | undefined, destPath: string, maxDuration: number) {
+function stitchSideBySide(
+  leftPath: string | undefined,
+  rightPath: string | undefined,
+  destPath: string,
+  maxDuration: number,
+) {
   if (!leftPath || !rightPath || !existsSync(leftPath) || !existsSync(rightPath)) {
     console.warn('Side-by-side stitch: missing video file(s)');
     return;
@@ -151,314 +154,342 @@ test.beforeAll(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Clip 1: Multi-Language AI Classification (30s)
+// Clip 1: Multi-Language (40s)
+// LEFT: Guest Kiosk (Mandarin request) | RIGHT: Staff Dashboard
 // ---------------------------------------------------------------------------
-test('Clip 1 - Multi-Language AI Classification', async ({ browser, request }) => {
-  test.setTimeout(120_000);
-
-  const { ctx, page, token } = await authenticatedContext(browser, request, 'juan@hotel-mariana.com');
-
-  await page.goto(`${PROD_URL}/dashboard`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, '3 Requests Incoming — English, Spanish, Mandarin');
-  await page.waitForTimeout(3000);
-
-  // Submit 3 requests via API in the background
-  await page.evaluate(async ({ apiUrl, orgId, token }) => {
-    const requests = [
-      { text: 'My faucet is leaking badly', room_number: '301', org_id: orgId },
-      { text: 'Necesito mas toallas por favor', room_number: '302', org_id: orgId },
-      { text: '\u7a7a\u8c03\u574f\u4e86\uff0c\u623f\u95f4\u91cc\u975e\u5e38\u70ed', room_number: '303', org_id: orgId },
-    ];
-    for (const body of requests) {
-      fetch(`${apiUrl}/api/requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).catch(() => {});
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }, { apiUrl: API_URL, orgId: ORG_ID, token });
-
-  await showOverlay(page, 'AI Processing — Groq translating + classifying all 3');
-  await page.waitForTimeout(15000);
-
-  // Refresh to ensure we see the new cards
-  await page.reload();
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(2000);
-
-  await showOverlay(page, 'English -> Maintenance | Spanish -> Housekeeping | Mandarin -> Maintenance', SAGE);
-  await page.waitForTimeout(5000);
-
-  await showOverlay(page, 'AI translated all 3 and routed to correct departments', SAGE);
-  await page.waitForTimeout(4000);
-
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-1-multilang.mp4'), 30);
-});
-
-// ---------------------------------------------------------------------------
-// Clip 2: Real-Time WebSocket — Guest to Staff (35s)
-// ---------------------------------------------------------------------------
-test('Clip 2 - Real-Time WebSocket Guest to Staff', async ({ browser, request }) => {
-  test.setTimeout(120_000);
+test('Clip 1 - Multi-Language', async ({ browser, request }) => {
+  test.setTimeout(180_000);
 
   const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
+  const { leftCtx, rightCtx, leftPage, rightPage } = await createSideBySidePair(browser);
 
-  // Two 640x720 contexts for side-by-side
-  const guestCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
-  });
-  const staffCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
-  });
+  // RIGHT: Staff dashboard
+  await authenticatePage(rightPage, staffToken, '/dashboard');
+  await showOverlay(rightPage, 'STAFF — Dashboard live via WebSocket');
+  await rightPage.waitForTimeout(2000);
 
-  const guestPage = await guestCtx.newPage();
-  const staffPage = await staffCtx.newPage();
+  // LEFT: Guest kiosk
+  await leftPage.goto(`${PROD_URL}/`);
+  await leftPage.waitForLoadState('networkidle');
+  await showOverlay(leftPage, 'GUEST — Mandarin-speaking guest');
+  await leftPage.waitForTimeout(2000);
 
-  // Staff: open dashboard
-  await staffPage.goto(`${PROD_URL}/`);
-  await staffPage.evaluate((t: string) => localStorage.setItem('hospiq_token', t), staffToken);
-  await staffPage.goto(`${PROD_URL}/dashboard`);
-  await staffPage.waitForLoadState('networkidle');
-  await showOverlay(staffPage, 'Staff Dashboard — Live via WebSocket');
-  await staffPage.waitForTimeout(2000);
-
-  // Guest: open kiosk
-  await guestPage.goto(`${PROD_URL}/`);
-  await guestPage.waitForLoadState('networkidle');
-  await showOverlay(guestPage, 'Guest Kiosk — Room 305');
-  await guestPage.waitForTimeout(2000);
-
-  // Guest: fill room
-  const roomInput = guestPage.locator('[data-testid="room-input"]');
+  // LEFT: Fill room number
+  const roomInput = leftPage.locator('[data-testid="room-input"]');
   if (await roomInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await roomInput.fill('305');
+    await roomInput.fill('601');
   }
-  await guestPage.waitForTimeout(1000);
+  await leftPage.waitForTimeout(1000);
 
-  // Guest: type request slowly
-  await showOverlay(guestPage, 'Guest Submitting...');
-  const textInput = guestPage.locator('[data-testid="request-input"]');
+  // LEFT: Type Mandarin request
+  await showOverlay(leftPage, 'GUEST — Typing in Mandarin Chinese');
+  const textInput = leftPage.locator('[data-testid="request-input"]');
   if (await textInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await textInput.click();
-    for (const char of "There's a water leak in my bathroom") {
-      await textInput.press(char === ' ' ? 'Space' : char === "'" ? "'" : char);
-      await guestPage.waitForTimeout(50);
-    }
+    await textInput.fill('\u7a7a\u8c03\u574f\u4e86\uff0c\u623f\u95f4\u91cc\u975e\u5e38\u70ed');
+    await leftPage.waitForTimeout(1500);
   }
-  await guestPage.waitForTimeout(1500);
 
-  // Staff: waiting
-  await showOverlay(staffPage, 'Staff waiting for new requests...');
+  await showOverlay(leftPage, 'GUEST — Mandarin: AC is broken, very hot');
+  await leftPage.waitForTimeout(3000);
 
-  // Guest: submit
-  await showOverlay(guestPage, 'Submitting request...', GOLD);
-  const submitBtn = guestPage.locator('[data-testid="submit-button"]');
+  // RIGHT: Waiting state
+  await showOverlay(rightPage, 'STAFF — Watching for incoming requests...');
+  await rightPage.waitForTimeout(1000);
+
+  // LEFT: Submit
+  await showOverlay(leftPage, 'GUEST — Submitting Mandarin request', GOLD);
+  const submitBtn = leftPage.locator('[data-testid="submit-button"]');
   if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await submitBtn.click();
   }
-  await guestPage.waitForTimeout(2000);
+  await leftPage.waitForTimeout(2000);
 
-  // AI classifying
-  await showOverlay(guestPage, 'AI Classifying via Groq (~10s)');
-  await showOverlay(staffPage, 'AI Classifying incoming request...');
-  await staffPage.waitForTimeout(12000);
+  // AI processing phase
+  await showOverlay(leftPage, 'AI — Groq translating Mandarin + classifying');
+  await showOverlay(rightPage, 'STAFF — AI processing Mandarin request...');
+  await rightPage.waitForTimeout(12000);
 
   // Results
-  await showOverlay(staffPage, 'New card on dashboard!', SAGE);
-  await showOverlay(guestPage, 'Request routed to Maintenance!', SAGE);
-  await guestPage.waitForTimeout(3000);
+  await showOverlay(leftPage, 'GUEST — Request routed to Maintenance!', SAGE);
+  await showOverlay(rightPage, 'STAFF — New card: Maintenance (Critical) — auto-translated!', SAGE);
+  await leftPage.waitForTimeout(5000);
+
+  // Final hold
+  await showOverlay(leftPage, 'GUEST — Progress stepper shows live status', SAGE);
+  await showOverlay(rightPage, 'STAFF — Mandarin auto-translated to English', SAGE);
+  await leftPage.waitForTimeout(5000);
+
+  // Stitch
+  const leftVideo = await leftPage.video()?.path();
+  const rightVideo = await rightPage.video()?.path();
+  await leftCtx.close();
+  await rightCtx.close();
+  stitchSideBySide(leftVideo, rightVideo, resolve(CLIPS_DIR, 'clip-1-multilang.mp4'), 40);
+});
+
+// ---------------------------------------------------------------------------
+// Clip 2: Real-Time Flow (35s)
+// LEFT: Guest Kiosk | RIGHT: Staff Dashboard
+// ---------------------------------------------------------------------------
+test('Clip 2 - Real-Time Flow', async ({ browser, request }) => {
+  test.setTimeout(180_000);
+
+  const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
+  const { leftCtx, rightCtx, leftPage, rightPage } = await createSideBySidePair(browser);
+
+  // RIGHT: Staff dashboard
+  await authenticatePage(rightPage, staffToken, '/dashboard');
+  await showOverlay(rightPage, 'STAFF — Dashboard live via WebSocket');
+  await rightPage.waitForTimeout(2000);
+
+  // LEFT: Guest kiosk
+  await leftPage.goto(`${PROD_URL}/`);
+  await leftPage.waitForLoadState('networkidle');
+  await showOverlay(leftPage, 'GUEST — Room 305');
+  await leftPage.waitForTimeout(2000);
+
+  // LEFT: Fill room
+  const roomInput = leftPage.locator('[data-testid="room-input"]');
+  if (await roomInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await roomInput.fill('305');
+  }
+  await leftPage.waitForTimeout(1000);
+
+  // LEFT: Type request slowly for visual effect
+  await showOverlay(leftPage, 'GUEST — Typing emergency request');
+  const textInput = leftPage.locator('[data-testid="request-input"]');
+  if (await textInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await textInput.click();
+    const msg = "There's a water leak flooding my bathroom!";
+    for (const char of msg) {
+      await textInput.press(char === ' ' ? 'Space' : char === "'" ? "'" : char === '!' ? '!' : char);
+      await leftPage.waitForTimeout(50);
+    }
+  }
+  await leftPage.waitForTimeout(1500);
+
+  // RIGHT: Waiting
+  await showOverlay(rightPage, 'STAFF — Waiting for new requests...');
+
+  // LEFT: Submit
+  await showOverlay(leftPage, 'GUEST — Submitting...', GOLD);
+  const submitBtn = leftPage.locator('[data-testid="submit-button"]');
+  if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await submitBtn.click();
+  }
+  await leftPage.waitForTimeout(2000);
+
+  // AI classifying
+  await showOverlay(leftPage, 'AI — Classifying via Groq (~10s)');
+  await showOverlay(rightPage, 'STAFF — AI classifying incoming request...');
+  await rightPage.waitForTimeout(12000);
+
+  // Results
+  await showOverlay(leftPage, 'GUEST — Routed to Maintenance!', SAGE);
+  await showOverlay(rightPage, 'STAFF — New workflow card appeared!', SAGE);
+  await leftPage.waitForTimeout(3000);
 
   // Final
-  await showOverlay(staffPage, 'Real-time update via WebSocket', SAGE);
-  await showOverlay(guestPage, 'Guest sees live progress', SAGE);
-  await guestPage.waitForTimeout(4000);
+  await showOverlay(leftPage, 'GUEST — Live progress via WebSocket', SAGE);
+  await showOverlay(rightPage, 'STAFF — Real-time update received', SAGE);
+  await leftPage.waitForTimeout(4000);
 
-  const guestVideoPath = await guestPage.video()?.path();
-  const staffVideoPath = await staffPage.video()?.path();
-
-  await guestCtx.close();
-  await staffCtx.close();
-
-  stitchSideBySide(guestVideoPath, staffVideoPath, resolve(CLIPS_DIR, 'clip-2-realtime.mp4'), 35);
+  const leftVideo = await leftPage.video()?.path();
+  const rightVideo = await rightPage.video()?.path();
+  await leftCtx.close();
+  await rightCtx.close();
+  stitchSideBySide(leftVideo, rightVideo, resolve(CLIPS_DIR, 'clip-2-realtime.mp4'), 35);
 });
 
 // ---------------------------------------------------------------------------
-// Clip 3: Staff Workflow Management (25s)
+// Clip 3: Staff Claims -> Guest Sees Update (30s)
+// LEFT: Guest progress stepper | RIGHT: Staff Dashboard
 // ---------------------------------------------------------------------------
-test('Clip 3 - Staff Workflow Management', async ({ browser, request }) => {
-  test.setTimeout(90_000);
+test('Clip 3 - Staff Claims Guest Sees Update', async ({ browser, request }) => {
+  test.setTimeout(180_000);
 
-  const { ctx, page } = await authenticatedContext(browser, request, 'juan@hotel-mariana.com');
+  const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
+  const { leftCtx, rightCtx, leftPage, rightPage } = await createSideBySidePair(browser);
 
-  await page.goto(`${PROD_URL}/dashboard`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'Staff Dashboard — Managing Workflows');
-  await page.waitForTimeout(3000);
+  // Submit a request via API so both views have something to work with
+  try {
+    await request.post(`${API_URL}/api/requests`, {
+      data: {
+        text: 'The drain in my bathroom is completely clogged',
+        room_number: '305',
+        org_id: ORG_ID,
+      },
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch { /* best effort */ }
 
-  // Click a workflow card
-  const card = page.locator('[data-testid="workflow-card"]').first();
+  // Wait for Groq to process
+  await new Promise(r => setTimeout(r, 12000));
+
+  // LEFT: Guest kiosk — submit same request so we land on the progress stepper
+  await leftPage.goto(`${PROD_URL}/`);
+  await leftPage.waitForLoadState('networkidle');
+
+  const roomInput = leftPage.locator('[data-testid="room-input"]');
+  if (await roomInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await roomInput.fill('305');
+  }
+  const textInput = leftPage.locator('[data-testid="request-input"]');
+  if (await textInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await textInput.fill('The drain in my bathroom is completely clogged');
+  }
+  const submitBtn = leftPage.locator('[data-testid="submit-button"]');
+  if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await submitBtn.click();
+  }
+  await leftPage.waitForTimeout(2000);
+
+  await showOverlay(leftPage, 'GUEST — Waiting for help (progress stepper)');
+  await leftPage.waitForTimeout(10000);
+
+  // RIGHT: Staff dashboard
+  await authenticatePage(rightPage, staffToken, '/dashboard');
+  await showOverlay(rightPage, 'STAFF — Dashboard with workflow cards');
+  await rightPage.waitForTimeout(2000);
+
+  // RIGHT: Click a workflow card
+  const card = rightPage.locator('[data-testid="workflow-card"]').first();
   if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await showOverlay(rightPage, 'STAFF — Opening workflow detail...');
     await card.click();
-    await page.waitForTimeout(1500);
+    await rightPage.waitForTimeout(2000);
 
-    await showOverlay(page, 'Viewing request details + event timeline');
-    await page.waitForTimeout(3000);
-
-    // Click Claim button
-    const claimBtn = page.getByRole('button', { name: /claim/i }).first();
+    // RIGHT: Click Claim
+    const claimBtn = rightPage.getByRole('button', { name: /claim/i }).first();
     if (await claimBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await claimBtn.click();
-      await page.waitForTimeout(1000);
-      await showOverlay(page, 'Workflow claimed — assigned to staff member', SAGE);
-      await page.waitForTimeout(3000);
+      await rightPage.waitForTimeout(1500);
+      await showOverlay(rightPage, 'STAFF — Workflow claimed!', SAGE);
+      await showOverlay(leftPage, 'GUEST — Staff member assigned!', SAGE);
+      await leftPage.waitForTimeout(3000);
 
-      // Click Start Work / In Progress
-      const startBtn = page.getByRole('button', { name: /start|in.?progress/i }).first();
-      if (await startBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await startBtn.click();
-        await page.waitForTimeout(1000);
-        await showOverlay(page, 'Status: In Progress', SAGE);
-        await page.waitForTimeout(3000);
+      // RIGHT: Click Resolve
+      const resolveBtn = rightPage.getByRole('button', { name: /resolve|complete/i }).first();
+      if (await resolveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await resolveBtn.click();
+        await rightPage.waitForTimeout(1500);
+        await showOverlay(rightPage, 'STAFF — Workflow resolved!', SAGE);
+        await showOverlay(leftPage, 'GUEST — Request resolved!', SAGE);
+        await leftPage.waitForTimeout(3000);
       }
     } else {
-      await showOverlay(page, 'Workflow already claimed — viewing details');
-      await page.waitForTimeout(3000);
+      await showOverlay(rightPage, 'STAFF — Viewing workflow details', GOLD);
+      await showOverlay(leftPage, 'GUEST — Stepper shows Team Notified', SAGE);
+      await leftPage.waitForTimeout(4000);
     }
   } else {
-    await showOverlay(page, 'No workflow cards available — submit a request first', CORAL);
-    await page.waitForTimeout(3000);
+    await showOverlay(rightPage, 'STAFF — No workflow cards yet', CORAL);
+    await showOverlay(leftPage, 'GUEST — Waiting for assignment...', GOLD);
+    await leftPage.waitForTimeout(4000);
   }
 
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-3-workflow.mp4'), 25);
+  const leftVideo = await leftPage.video()?.path();
+  const rightVideo = await rightPage.video()?.path();
+  await leftCtx.close();
+  await rightCtx.close();
+  stitchSideBySide(leftVideo, rightVideo, resolve(CLIPS_DIR, 'clip-3-claims.mp4'), 30);
 });
 
 // ---------------------------------------------------------------------------
-// Clip 4: Manager Analytics (20s)
+// Clip 4: Analytics + Escalation (25s)
+// LEFT: Analytics (D3 charts) | RIGHT: Escalation Center
 // ---------------------------------------------------------------------------
-test('Clip 4 - Manager Analytics', async ({ browser, request }) => {
-  test.setTimeout(60_000);
+test('Clip 4 - Analytics and Escalation', async ({ browser, request }) => {
+  test.setTimeout(120_000);
 
-  const { ctx, page } = await authenticatedContext(browser, request, 'maria@hotel-mariana.com');
+  const managerToken = await loginAs(request, 'maria@hotel-mariana.com');
+  const { leftCtx, rightCtx, leftPage, rightPage } = await createSideBySidePair(browser);
 
-  await page.goto(`${PROD_URL}/analytics`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'Manager Analytics — D3 Visualizations');
-  await page.waitForTimeout(3000);
+  // LEFT: Analytics
+  await authenticatePage(leftPage, managerToken, '/analytics');
+  await showOverlay(leftPage, 'ANALYTICS — Real-time D3 visualizations');
+  await leftPage.waitForTimeout(2000);
 
-  // Wait for D3 charts
-  await page.waitForSelector('svg', { timeout: 10000 }).catch(() => {});
-  await showOverlay(page, 'Stream Graph — Request volume by department (24h)');
-  await page.waitForTimeout(4000);
+  // Wait for D3 SVGs to render
+  await leftPage.waitForSelector('svg', { timeout: 10000 }).catch(() => {});
+  await leftPage.waitForTimeout(2000);
 
-  // Scroll down
-  await page.evaluate(() => window.scrollBy(0, 400));
-  await page.waitForTimeout(1000);
-  await showOverlay(page, 'AI Confidence Distribution + Live Event Feed');
-  await page.waitForTimeout(4000);
+  // RIGHT: Escalation center
+  await authenticatePage(rightPage, managerToken, '/manager');
+  await showOverlay(rightPage, 'ESCALATION — SLA breach monitoring', CORAL);
+  await rightPage.waitForTimeout(2000);
 
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-4-analytics.mp4'), 20);
-});
+  // Show both views simultaneously
+  await showOverlay(leftPage, 'ANALYTICS — Stream graph + confidence distribution');
+  await showOverlay(rightPage, 'ESCALATION — Active escalation cards', CORAL);
+  await leftPage.waitForTimeout(4000);
 
-// ---------------------------------------------------------------------------
-// Clip 5: SLA Escalation (20s)
-// ---------------------------------------------------------------------------
-test('Clip 5 - SLA Escalation', async ({ browser, request }) => {
-  test.setTimeout(60_000);
+  // Scroll analytics to show more
+  await leftPage.evaluate(() => window.scrollBy(0, 400));
+  await leftPage.waitForTimeout(1000);
+  await showOverlay(leftPage, 'ANALYTICS — AI confidence + live event feed');
+  await leftPage.waitForTimeout(4000);
 
-  const { ctx, page } = await authenticatedContext(browser, request, 'maria@hotel-mariana.com');
-
-  await page.goto(`${PROD_URL}/manager`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'Escalation Center — SLA Breach Monitoring', CORAL);
-  await page.waitForTimeout(4000);
-
-  // Show escalated cards
-  const escalated = page.locator('[data-testid="workflow-card"], [data-testid="escalation-card"]').first();
-  if (await escalated.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await showOverlay(page, 'Escalated workflows — coral severity styling', CORAL);
-    await page.waitForTimeout(4000);
+  // Show escalated items if any
+  const escalated = rightPage.locator('[data-testid="workflow-card"], [data-testid="escalation-card"]').first();
+  if (await escalated.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await showOverlay(rightPage, 'ESCALATION — Workflows breaching SLA', CORAL);
   } else {
-    await showOverlay(page, 'No current escalations — all SLAs within threshold', SAGE);
-    await page.waitForTimeout(3000);
+    await showOverlay(rightPage, 'ESCALATION — All SLAs within threshold', SAGE);
   }
+  await leftPage.waitForTimeout(4000);
 
-  await showOverlay(page, 'Managers can override AI classification', GOLD);
-  await page.waitForTimeout(3000);
-
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-5-escalation.mp4'), 20);
+  const leftVideo = await leftPage.video()?.path();
+  const rightVideo = await rightPage.video()?.path();
+  await leftCtx.close();
+  await rightCtx.close();
+  stitchSideBySide(leftVideo, rightVideo, resolve(CLIPS_DIR, 'clip-4-analytics-escalation.mp4'), 25);
 });
 
 // ---------------------------------------------------------------------------
-// Clip 6: Demo Landing Page (15s)
+// Clip 5: Admin + Demo (20s)
+// LEFT: Demo landing | RIGHT: Admin departments
 // ---------------------------------------------------------------------------
-test('Clip 6 - Demo Landing Page', async ({ browser }) => {
-  test.setTimeout(30_000);
+test('Clip 5 - Admin and Demo', async ({ browser, request }) => {
+  test.setTimeout(120_000);
 
-  const ctx = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-    recordVideo: { dir: RAW_DIR, size: { width: 1280, height: 800 } },
-  });
-  const page = await ctx.newPage();
+  const adminToken = await loginAs(request, 'admin@hotel-mariana.com');
+  const { leftCtx, rightCtx, leftPage, rightPage } = await createSideBySidePair(browser);
 
-  await page.goto(`${PROD_URL}/demo`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'HospiQ — Choose a role to explore');
-  await page.waitForTimeout(3000);
+  // LEFT: Demo page (no auth needed)
+  await leftPage.goto(`${PROD_URL}/demo`);
+  await leftPage.waitForLoadState('networkidle');
+  await showOverlay(leftPage, 'DEMO — One-click role access');
+  await leftPage.waitForTimeout(2000);
 
-  // Hover over each role card
-  const roleCards = page.locator('[data-testid="role-card"]');
+  // Hover over role cards for visual effect
+  const roleCards = leftPage.locator('[data-testid="role-card"]');
   const cardCount = await roleCards.count().catch(() => 0);
   for (let i = 0; i < Math.min(cardCount, 4); i++) {
     await roleCards.nth(i).hover();
-    await page.waitForTimeout(800);
+    await leftPage.waitForTimeout(800);
   }
-  await page.waitForTimeout(1000);
 
-  await showOverlay(page, 'One-click access to Guest, Staff, Manager, Admin views', SAGE);
-  await page.waitForTimeout(3000);
+  // RIGHT: Admin departments
+  await authenticatePage(rightPage, adminToken, '/admin/departments');
+  await showOverlay(rightPage, 'ADMIN — Department & SLA configuration');
+  await rightPage.waitForTimeout(2000);
 
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-6-demo.mp4'), 15);
-});
+  // Wait for table
+  await rightPage.waitForSelector('table, [role="table"], .grid', { timeout: 5000 }).catch(() => {});
+  await rightPage.waitForTimeout(2000);
 
-// ---------------------------------------------------------------------------
-// Clip 7: Admin — Departments & Rooms (15s)
-// ---------------------------------------------------------------------------
-test('Clip 7 - Admin Departments and Rooms', async ({ browser, request }) => {
-  test.setTimeout(60_000);
+  // Final overlays
+  await showOverlay(leftPage, 'DEMO — Guest, Staff, Manager, Admin views', SAGE);
+  await showOverlay(rightPage, 'ADMIN — Departments, rooms, SLA rules', SAGE);
+  await leftPage.waitForTimeout(5000);
 
-  const { ctx, page } = await authenticatedContext(browser, request, 'admin@hotel-mariana.com');
-
-  await page.goto(`${PROD_URL}/admin/departments`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'Admin — Configure departments + SLA rules');
-  await page.waitForTimeout(4000);
-
-  // Wait for table to load
-  await page.waitForSelector('table, [role="table"], .grid', { timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(2000);
-
-  await page.goto(`${PROD_URL}/admin/rooms`);
-  await page.waitForLoadState('networkidle');
-  await showOverlay(page, 'Admin — Manage rooms + QR code generation');
-  await page.waitForTimeout(4000);
-
-  const videoPath = await page.video()?.path();
-  await ctx.close();
-  renameVideo(videoPath, resolve(CLIPS_DIR, 'clip-7-admin.mp4'), 15);
+  const leftVideo = await leftPage.video()?.path();
+  const rightVideo = await rightPage.video()?.path();
+  await leftCtx.close();
+  await rightCtx.close();
+  stitchSideBySide(leftVideo, rightVideo, resolve(CLIPS_DIR, 'clip-5-admin-demo.mp4'), 20);
 });
 
 // ---------------------------------------------------------------------------
@@ -473,11 +504,9 @@ test('Concatenate master demo video', async () => {
   const clipFiles = [
     'clip-1-multilang.mp4',
     'clip-2-realtime.mp4',
-    'clip-3-workflow.mp4',
-    'clip-4-analytics.mp4',
-    'clip-5-escalation.mp4',
-    'clip-6-demo.mp4',
-    'clip-7-admin.mp4',
+    'clip-3-claims.mp4',
+    'clip-4-analytics-escalation.mp4',
+    'clip-5-admin-demo.mp4',
   ];
 
   const existing = clipFiles.filter(f => existsSync(resolve(CLIPS_DIR, f)));
@@ -488,11 +517,11 @@ test('Concatenate master demo video', async () => {
 
   console.log(`Found ${existing.length}/${clipFiles.length} clips. Creating master video...`);
 
-  // Create a 1-second black frame video for transitions
+  // Create a 1-second black frame video for transitions (1280x720 to match stitched output)
   const blackPath = resolve(RAW_DIR, 'black.mp4');
   try {
     execSync(
-      `ffmpeg -y -f lavfi -i color=c=black:s=1280x800:d=1 -r 15 -c:v libx264 -preset fast "${blackPath}"`,
+      `ffmpeg -y -f lavfi -i color=c=black:s=1280x720:d=1 -r 15 -c:v libx264 -preset fast "${blackPath}"`,
       { stdio: 'pipe', timeout: 30000 },
     );
   } catch (e) {
@@ -511,7 +540,7 @@ test('Concatenate master demo video', async () => {
   const concatFile = resolve(RAW_DIR, 'concat.txt');
   writeFileSync(concatFile, concatLines.join('\n'));
 
-  const masterPath = resolve('docs/clips/demo-complete.mp4');
+  const masterPath = resolve(CLIPS_DIR, 'demo-complete.mp4');
   try {
     execSync(
       `ffmpeg -y -f concat -safe 0 -i "${concatFile}" -c:v libx264 -preset fast -crf 23 "${masterPath}"`,
