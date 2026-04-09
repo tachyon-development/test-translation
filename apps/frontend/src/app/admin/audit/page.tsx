@@ -24,12 +24,14 @@ import {
 
 interface AuditEntry {
   id: string;
-  timestamp: string;
-  actor: string;
-  actor_name?: string;
+  createdAt: string;
   action: string;
-  resource_type: string;
-  resource_id: string;
+  resourceType: string;
+  resourceId: string | null;
+  actorId: string | null;
+  actor: { id: string; name: string; role: string } | null;
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
 }
 
 interface AuditResponse {
@@ -163,10 +165,10 @@ export default function AuditLogPage() {
                   {entries.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="whitespace-nowrap font-mono text-xs text-[var(--text-muted)]">
-                        {new Date(entry.timestamp).toLocaleString()}
+                        {new Date(entry.createdAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-[var(--text-secondary)]">
-                        {entry.actor_name ?? entry.actor?.slice(0, 8) ?? "--"}
+                        {entry.actor?.name ?? entry.actorId?.slice(0, 8) ?? "System"}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -176,10 +178,10 @@ export default function AuditLogPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-[var(--text-secondary)]">
-                        {entry.resource_type}
+                        {entry.resourceType}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-[var(--text-muted)]">
-                        {entry.resource_id?.slice(0, 12) ?? "--"}
+                        {entry.resourceId?.slice(0, 12) ?? "--"}
                       </TableCell>
                     </TableRow>
                   ))}
