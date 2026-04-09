@@ -4,6 +4,10 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@hospiq/db";
 import type { SlaConfig } from "@hospiq/db/src/schema/departments";
 import { buildClassifyPrompt } from "../prompts/classify";
+import {
+  CircuitBreaker,
+  CircuitOpenError,
+} from "../../../api/src/lib/circuitBreaker";
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://ollama:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3";
@@ -34,6 +38,13 @@ export function createClassificationWorker() {
 
   const escalationQueue = new Queue("escalation-check", { connection });
 
+  const ollamaBreaker = new CircuitBreaker({
+    name: "ollama",
+    threshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "3"),
+    resetTimeMs: parseInt(process.env.CIRCUIT_BREAKER_RESET_MS || "30000"),
+    redis: connection,
+  });
+
   const worker = new Worker<ClassificationJob>(
     "classification",
     async (job: Job<ClassificationJob>) => {
@@ -59,25 +70,85 @@ export function createClassificationWorker() {
 
       const deptNames = departments.map((d) => d.name);
 
-      // 4. Call Ollama
+      // 4. Call Ollama (wrapped in circuit breaker)
       const prompt = buildClassifyPrompt(text, deptNames);
-      const ollamaRes = await fetch(`${OLLAMA_URL}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          prompt,
-          stream: false,
-        }),
-      });
 
-      if (!ollamaRes.ok) {
-        throw new Error(
-          `Ollama request failed: ${ollamaRes.status} ${await ollamaRes.text()}`,
-        );
+      let ollamaData: { response: string };
+      try {
+        ollamaData = await ollamaBreaker.execute(async () => {
+          const ollamaRes = await fetch(`${OLLAMA_URL}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: OLLAMA_MODEL,
+              prompt,
+              stream: false,
+            }),
+          });
+
+          if (!ollamaRes.ok) {
+            throw new Error(
+              `Ollama request failed: ${ollamaRes.status} ${await ollamaRes.text()}`,
+            );
+          }
+
+          return (await ollamaRes.json()) as { response: string };
+        });
+      } catch (error) {
+        if (error instanceof CircuitOpenError) {
+          console.warn(
+            `Circuit breaker OPEN for Ollama — falling back to manual review for request ${requestId}`,
+          );
+
+          // Fallback: mark as manual_review
+          await db
+            .update(schema.requests)
+            .set({ status: "manual_review" })
+            .where(eq(schema.requests.id, requestId));
+
+          // Create workflow without AI classification
+          const [workflow] = await db
+            .insert(schema.workflows)
+            .values({
+              requestId,
+              orgId,
+              departmentId: null as unknown as string, // no department — needs manual assignment
+              priority: "medium",
+              status: "pending",
+            })
+            .returning({ id: schema.workflows.id });
+
+          await db.insert(schema.workflowEvents).values({
+            workflowId: workflow.id,
+            eventType: "created",
+            payload: {
+              reason:
+                "AI service unavailable — manual classification required",
+            },
+          });
+
+          // Publish for staff dashboard
+          await pubRedis.publish(
+            `org:${orgId}:workflows`,
+            JSON.stringify({
+              type: "workflow_created",
+              workflow: { ...workflow, manualReview: true },
+            }),
+          );
+
+          await pubRedis.publish(
+            `request:${requestId}:status`,
+            JSON.stringify({
+              type: "manual_review",
+              message:
+                "AI classification unavailable. Staff will review your request shortly.",
+            }),
+          );
+
+          return;
+        }
+        throw error; // Re-throw for BullMQ retry
       }
-
-      const ollamaData = (await ollamaRes.json()) as { response: string };
 
       // 5. Parse JSON response
       const jsonMatch = ollamaData.response.match(/\{[\s\S]*\}/);

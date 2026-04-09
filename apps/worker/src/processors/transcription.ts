@@ -2,6 +2,10 @@ import { Worker, Queue, type Job } from "bullmq";
 import IORedis from "ioredis";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@hospiq/db";
+import {
+  CircuitBreaker,
+  CircuitOpenError,
+} from "../../../api/src/lib/circuitBreaker";
 
 const WHISPER_URL = process.env.WHISPER_URL || "http://whisper:8080";
 
@@ -24,6 +28,13 @@ export function createTranscriptionWorker() {
 
   const classificationQueue = new Queue("classification", { connection });
 
+  const whisperBreaker = new CircuitBreaker({
+    name: "whisper",
+    threshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "3"),
+    resetTimeMs: parseInt(process.env.CIRCUIT_BREAKER_RESET_MS || "30000"),
+    redis: connection,
+  });
+
   const worker = new Worker<TranscriptionJob>(
     "transcription",
     async (job: Job<TranscriptionJob>) => {
@@ -36,36 +47,49 @@ export function createTranscriptionWorker() {
         JSON.stringify({ type: "processing", step: "transcribing" }),
       );
 
-      // 2. Send audio to Whisper
-      const audioFile = Bun.file(audioPath);
-      const formData = new FormData();
-      formData.append("file", audioFile, "audio.webm");
-      formData.append("model", "whisper-1");
+      // 2. Send audio to Whisper (wrapped in circuit breaker)
+      let whisperData: { text: string; language?: string };
+      try {
+        whisperData = await whisperBreaker.execute(async () => {
+          const audioFile = Bun.file(audioPath);
+          const formData = new FormData();
+          formData.append("file", audioFile, "audio.webm");
+          formData.append("model", "whisper-1");
 
-      const whisperRes = await fetch(
-        `${WHISPER_URL}/v1/audio/transcriptions`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+          const whisperRes = await fetch(
+            `${WHISPER_URL}/v1/audio/transcriptions`,
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
-      if (!whisperRes.ok) {
-        throw new Error(
-          `Whisper request failed: ${whisperRes.status} ${await whisperRes.text()}`,
-        );
+          if (!whisperRes.ok) {
+            throw new Error(
+              `Whisper request failed: ${whisperRes.status} ${await whisperRes.text()}`,
+            );
+          }
+
+          return (await whisperRes.json()) as {
+            text: string;
+            language?: string;
+          };
+        });
+      } catch (error) {
+        if (error instanceof CircuitOpenError) {
+          console.warn(
+            `Circuit breaker OPEN for Whisper — voice request ${requestId} cannot be transcribed`,
+          );
+          // Re-throw so BullMQ retries / eventually sends to DLQ
+          throw error;
+        }
+        throw error; // Re-throw other errors for BullMQ retry
       }
-
-      // 3. Parse result
-      const whisperData = (await whisperRes.json()) as {
-        text: string;
-        language?: string;
-      };
 
       const transcript = whisperData.text;
       const language = whisperData.language ?? "en";
 
-      // 4. INSERT transcription record
+      // 3. INSERT transcription record
       await db.insert(schema.transcriptions).values({
         requestId,
         audioUrl: audioPath,
@@ -74,7 +98,7 @@ export function createTranscriptionWorker() {
         confidence: 0.9, // Whisper doesn't always return confidence
       });
 
-      // 5. UPDATE request (originalText, originalLang)
+      // 4. UPDATE request (originalText, originalLang)
       await db
         .update(schema.requests)
         .set({
@@ -83,7 +107,7 @@ export function createTranscriptionWorker() {
         })
         .where(eq(schema.requests.id, requestId));
 
-      // 6. Publish "transcribed" status
+      // 5. Publish "transcribed" status
       await pubRedis.publish(
         `request:${requestId}:status`,
         JSON.stringify({
@@ -94,7 +118,7 @@ export function createTranscriptionWorker() {
         }),
       );
 
-      // 7. Chain to classification queue
+      // 6. Chain to classification queue
       await classificationQueue.add("classify", {
         requestId,
         text: transcript,
