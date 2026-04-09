@@ -22,7 +22,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const offset = (page - 1) * limit;
 
         const rows = await db.query.integrations.findMany({
-          where: eq(schema.integrations.orgId, user!.orgId),
+          where: eq(schema.integrations.orgId, user?.orgId ?? ""),
           orderBy: (i, { desc: d }) => [d(i.createdAt)],
           limit,
           offset,
@@ -31,7 +31,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const [countResult] = await db
           .select({ count: sql<number>`count(*)::int` })
           .from(schema.integrations)
-          .where(eq(schema.integrations.orgId, user!.orgId));
+          .where(eq(schema.integrations.orgId, user?.orgId ?? ""));
 
         return {
           data: rows,
@@ -64,7 +64,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const [integration] = await db
           .insert(schema.integrations)
           .values({
-            orgId: user!.orgId,
+            orgId: user?.orgId ?? "",
             name: body.name,
             type: body.type as any,
             provider: body.provider,
@@ -103,7 +103,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
       const integration = await db.query.integrations.findFirst({
         where: and(
           eq(schema.integrations.id, params.id),
-          eq(schema.integrations.orgId, user!.orgId),
+          eq(schema.integrations.orgId, user?.orgId ?? ""),
         ),
       });
 
@@ -128,7 +128,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const existing = await db.query.integrations.findFirst({
           where: and(
             eq(schema.integrations.id, params.id),
-            eq(schema.integrations.orgId, user!.orgId),
+            eq(schema.integrations.orgId, user?.orgId ?? ""),
           ),
         });
 
@@ -179,7 +179,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
       const existing = await db.query.integrations.findFirst({
         where: and(
           eq(schema.integrations.id, params.id),
-          eq(schema.integrations.orgId, user!.orgId),
+          eq(schema.integrations.orgId, user?.orgId ?? ""),
         ),
       });
 
@@ -213,7 +213,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
       const integration = await db.query.integrations.findFirst({
         where: and(
           eq(schema.integrations.id, params.id),
-          eq(schema.integrations.orgId, user!.orgId),
+          eq(schema.integrations.orgId, user?.orgId ?? ""),
         ),
       });
 
@@ -306,7 +306,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
       const existing = await db.query.integrations.findFirst({
         where: and(
           eq(schema.integrations.id, params.id),
-          eq(schema.integrations.orgId, user!.orgId),
+          eq(schema.integrations.orgId, user?.orgId ?? ""),
         ),
       });
 
@@ -338,7 +338,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const integration = await db.query.integrations.findFirst({
           where: and(
             eq(schema.integrations.id, params.id),
-            eq(schema.integrations.orgId, user!.orgId),
+            eq(schema.integrations.orgId, user?.orgId ?? ""),
           ),
         });
 
@@ -392,7 +392,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
       const integration = await db.query.integrations.findFirst({
         where: and(
           eq(schema.integrations.id, params.id),
-          eq(schema.integrations.orgId, user!.orgId),
+          eq(schema.integrations.orgId, user?.orgId ?? ""),
         ),
       });
 
@@ -420,7 +420,7 @@ export const integrationRoutes = new Elysia({ prefix: "/api/integrations" })
         const integration = await db.query.integrations.findFirst({
           where: and(
             eq(schema.integrations.id, params.id),
-            eq(schema.integrations.orgId, user!.orgId),
+            eq(schema.integrations.orgId, user?.orgId ?? ""),
           ),
         });
 

@@ -10,7 +10,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
   .get("/departments", async ({ user, set }) => {
     try {
       return await db.query.departments.findMany({
-        where: eq(schema.departments.orgId, user!.orgId),
+        where: eq(schema.departments.orgId, user?.orgId ?? ""),
         orderBy: (d, { asc }) => [asc(d.name)],
       });
     } catch (err) {
@@ -28,7 +28,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
         const [dept] = await db
           .insert(schema.departments)
           .values({
-            orgId: user!.orgId,
+            orgId: user?.orgId ?? "",
             name: body.name,
             slug: body.slug,
             slaConfig: body.sla_config,
@@ -73,7 +73,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
           )
           .limit(1);
 
-        if (!dept || dept.orgId !== user!.orgId) {
+        if (!dept || dept.orgId !== user?.orgId ?? "") {
           set.status = 404;
           return { error: "Department not found" };
         }
@@ -116,7 +116,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
   .get("/rooms", async ({ user, set }) => {
     try {
       return await db.query.rooms.findMany({
-        where: eq(schema.rooms.orgId, user!.orgId),
+        where: eq(schema.rooms.orgId, user?.orgId ?? ""),
         orderBy: (r, { asc }) => [asc(r.number)],
       });
     } catch (err) {
@@ -134,7 +134,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
         const [room] = await db
           .insert(schema.rooms)
           .values({
-            orgId: user!.orgId,
+            orgId: user?.orgId ?? "",
             number: body.number,
             floor: body.floor,
             zone: body.zone,
@@ -169,10 +169,10 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
         const [countResult] = await db
           .select({ count: sql<number>`count(*)::int` })
           .from(schema.auditLog)
-          .where(eq(schema.auditLog.orgId, user!.orgId));
+          .where(eq(schema.auditLog.orgId, user?.orgId ?? ""));
 
         const rows = await db.query.auditLog.findMany({
-          where: eq(schema.auditLog.orgId, user!.orgId),
+          where: eq(schema.auditLog.orgId, user?.orgId ?? ""),
           orderBy: (a, { desc: d }) => [d(a.createdAt)],
           limit,
           offset,
@@ -210,7 +210,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
   .get("/users", async ({ user, set }) => {
     try {
       return await db.query.users.findMany({
-        where: eq(schema.users.orgId, user!.orgId),
+        where: eq(schema.users.orgId, user?.orgId ?? ""),
         columns: {
           id: true,
           name: true,
@@ -238,7 +238,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
         const [newUser] = await db
           .insert(schema.users)
           .values({
-            orgId: user!.orgId,
+            orgId: user?.orgId ?? "",
             name: body.name,
             email: body.email,
             role: body.role as any,

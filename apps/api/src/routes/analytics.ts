@@ -10,7 +10,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/api/analytics" })
   // GET /api/analytics/overview — KPIs
   .get("/overview", async ({ user, set }) => {
     try {
-      const orgId = user!.orgId;
+      const orgId = user?.orgId ?? "";
       const cacheKey = `org:${orgId}:stats`;
 
       // Check Redis cache
@@ -114,7 +114,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/api/analytics" })
   // GET /api/analytics/departments — Per-department breakdown
   .get("/departments", async ({ user, set }) => {
     try {
-      const orgId = user!.orgId;
+      const orgId = user?.orgId ?? "";
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
       const rows = await db
@@ -157,7 +157,7 @@ export const analyticsRoutes = new Elysia({ prefix: "/api/analytics" })
   // GET /api/analytics/ai — AI performance
   .get("/ai", async ({ user, set }) => {
     try {
-      const orgId = user!.orgId;
+      const orgId = user?.orgId ?? "";
 
       // Get all AI classifications for this org (join through requests)
       const classifications = await db

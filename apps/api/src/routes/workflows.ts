@@ -24,7 +24,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
     "/",
     async ({ user, query, set }) => {
       try {
-        const conditions = [eq(schema.workflows.orgId, user!.orgId)];
+        const conditions = [eq(schema.workflows.orgId, user?.orgId ?? "")];
 
         if (query.department_id) {
           conditions.push(eq(schema.workflows.departmentId, query.department_id));
@@ -67,7 +67,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
       const workflow = await db.query.workflows.findFirst({
         where: and(
           eq(schema.workflows.id, params.id),
-          eq(schema.workflows.orgId, user!.orgId),
+          eq(schema.workflows.orgId, user?.orgId ?? ""),
         ),
         with: {
           department: true,
@@ -113,7 +113,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
         .where(
           and(
             eq(schema.workflows.id, params.id),
-            eq(schema.workflows.orgId, user!.orgId),
+            eq(schema.workflows.orgId, user?.orgId ?? ""),
           ),
         )
         .limit(1);
@@ -130,21 +130,21 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
 
       const [updated] = await db
         .update(schema.workflows)
-        .set({ assignedTo: user!.sub, status: "claimed" })
+        .set({ assignedTo: user?.sub ?? "", status: "claimed" })
         .where(eq(schema.workflows.id, params.id))
         .returning();
 
       await db.insert(schema.workflowEvents).values({
         workflowId: params.id,
-        actorId: user!.sub,
+        actorId: user?.sub ?? "",
         eventType: "claimed",
-        payload: { claimedBy: user!.sub },
+        payload: { claimedBy: user?.sub ?? "" },
       });
 
-      publishWorkflowUpdate(user!.orgId, workflow.departmentId, workflow.requestId, {
+      publishWorkflowUpdate(user?.orgId ?? "", workflow.departmentId, workflow.requestId, {
         type: "workflow.claimed",
         workflowId: params.id,
-        assignedTo: user!.sub,
+        assignedTo: user?.sub ?? "",
       });
 
       return updated;
@@ -166,7 +166,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
           .where(
             and(
               eq(schema.workflows.id, params.id),
-              eq(schema.workflows.orgId, user!.orgId),
+              eq(schema.workflows.orgId, user?.orgId ?? ""),
             ),
           )
           .limit(1);
@@ -193,12 +193,12 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
         const eventType = body.status === "resolved" ? "resolved" : "status_change";
         await db.insert(schema.workflowEvents).values({
           workflowId: params.id,
-          actorId: user!.sub,
+          actorId: user?.sub ?? "",
           eventType,
           payload: { status: body.status, resolution_note: body.resolution_note },
         });
 
-        publishWorkflowUpdate(user!.orgId, workflow.departmentId, workflow.requestId, {
+        publishWorkflowUpdate(user?.orgId ?? "", workflow.departmentId, workflow.requestId, {
           type: `workflow.${body.status}`,
           workflowId: params.id,
           status: body.status,
@@ -225,7 +225,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
       const workflow = await db.query.workflows.findFirst({
         where: and(
           eq(schema.workflows.id, params.id),
-          eq(schema.workflows.orgId, user!.orgId),
+          eq(schema.workflows.orgId, user?.orgId ?? ""),
         ),
         with: { department: true },
       });
@@ -248,12 +248,12 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
 
       await db.insert(schema.workflowEvents).values({
         workflowId: params.id,
-        actorId: user!.sub,
+        actorId: user?.sub ?? "",
         eventType: "escalated",
         payload: { escalatedTo: workflow.department?.escalationTo },
       });
 
-      publishWorkflowUpdate(user!.orgId, workflow.departmentId, workflow.requestId, {
+      publishWorkflowUpdate(user?.orgId ?? "", workflow.departmentId, workflow.requestId, {
         type: "workflow.escalated",
         workflowId: params.id,
       });
@@ -277,7 +277,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
           .where(
             and(
               eq(schema.workflows.id, params.id),
-              eq(schema.workflows.orgId, user!.orgId),
+              eq(schema.workflows.orgId, user?.orgId ?? ""),
             ),
           )
           .limit(1);
@@ -291,13 +291,13 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
           .insert(schema.workflowEvents)
           .values({
             workflowId: params.id,
-            actorId: user!.sub,
+            actorId: user?.sub ?? "",
             eventType: "comment",
             payload: { text: body.text },
           })
           .returning();
 
-        publishWorkflowUpdate(user!.orgId, workflow.departmentId, workflow.requestId, {
+        publishWorkflowUpdate(user?.orgId ?? "", workflow.departmentId, workflow.requestId, {
           type: "workflow.comment",
           workflowId: params.id,
           text: body.text,
@@ -326,7 +326,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
           .where(
             and(
               eq(schema.workflows.id, params.id),
-              eq(schema.workflows.orgId, user!.orgId),
+              eq(schema.workflows.orgId, user?.orgId ?? ""),
             ),
           )
           .limit(1);
@@ -347,7 +347,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
 
         await db.insert(schema.workflowEvents).values({
           workflowId: params.id,
-          actorId: user!.sub,
+          actorId: user?.sub ?? "",
           eventType: "reassigned",
           payload: {
             department_id: body.department_id,
@@ -357,7 +357,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
           },
         });
 
-        publishWorkflowUpdate(user!.orgId, body.department_id, workflow.requestId, {
+        publishWorkflowUpdate(user?.orgId ?? "", body.department_id, workflow.requestId, {
           type: "workflow.reassigned",
           workflowId: params.id,
           department_id: body.department_id,
@@ -367,7 +367,7 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
         // Also publish to old department if different
         if (workflow.departmentId && workflow.departmentId !== body.department_id) {
           redisPublish(
-            `org:${user!.orgId}:dept:${workflow.departmentId}`,
+            `org:${user?.orgId ?? ""}:dept:${workflow.departmentId}`,
             JSON.stringify({
               type: "workflow.reassigned",
               workflowId: params.id,
