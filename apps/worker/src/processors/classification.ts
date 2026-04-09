@@ -211,7 +211,7 @@ export function createClassificationWorker() {
         urgency: result.urgency,
         summary: result.summary,
         confidence: 0.85, // Ollama doesn't provide confidence; use default
-        rawResponse: ollamaData,
+        rawResponse: { response: aiResponseText },
       });
 
       // 8. UPDATE request status to "classified", set translated text
