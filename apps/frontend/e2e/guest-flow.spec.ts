@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/auth';
+import type { Route } from '@playwright/test';
 
 test.describe('Guest Flow', () => {
   test('guest can submit a text request', async ({ guestPage }) => {
@@ -23,7 +24,7 @@ test.describe('Guest Flow', () => {
 
   test('guest sees error gracefully if submission fails', async ({ guestPage }) => {
     // Intercept API to force failure
-    await guestPage.route('**/api/requests', (route) => route.abort());
+    await guestPage.route('**/api/requests', (route: Route) => route.abort());
     await guestPage.goto('/');
     await guestPage.fill('[data-testid="room-input"]', '412');
     await guestPage.fill('[data-testid="request-input"]', 'Test request');

@@ -2,7 +2,13 @@ import { Worker, Queue, type Job } from "bullmq";
 import IORedis from "ioredis";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@hospiq/db";
-import type { SlaConfig } from "@hospiq/db/src/schema/departments";
+
+type SlaConfig = {
+  low: number;
+  medium: number;
+  high: number;
+  critical: number;
+};
 import { buildClassifyPrompt } from "../prompts/classify";
 import {
   CircuitBreaker,

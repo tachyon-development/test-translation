@@ -1,5 +1,12 @@
 import { test as base, Page } from '@playwright/test';
 
+type CustomFixtures = {
+  staffPage: Page;
+  managerPage: Page;
+  adminPage: Page;
+  guestPage: Page;
+};
+
 // Login helper per role
 async function loginAs(page: Page, email: string, password: string = 'demo2026') {
   const response = await page.request.post('/api/auth/login', {
@@ -9,7 +16,7 @@ async function loginAs(page: Page, email: string, password: string = 'demo2026')
   await page.evaluate((t) => localStorage.setItem('hospiq_token', t), token);
 }
 
-export const test = base.extend({
+export const test = base.extend<CustomFixtures>({
   staffPage: async ({ browser }, use) => {
     const page = await browser.newPage();
     await loginAs(page, 'juan@hotel-mariana.com');

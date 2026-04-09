@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures/auth';
+import type { Route } from '@playwright/test';
 
 test.describe('Fault Tolerance', () => {
   test('system handles AI unavailability gracefully', async ({ guestPage }) => {
     // Intercept Ollama calls to simulate failure
-    await guestPage.route('**/api/generate', (route) => route.abort());
+    await guestPage.route('**/api/generate', (route: Route) => route.abort());
     await guestPage.goto('/');
     await guestPage.fill('[data-testid="room-input"]', '412');
     await guestPage.fill('[data-testid="request-input"]', 'Test with AI down');

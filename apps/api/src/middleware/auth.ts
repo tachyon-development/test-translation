@@ -1,22 +1,24 @@
 import { Elysia } from "elysia";
 import { verifyToken, type JWTPayload } from "../lib/auth";
 
-export const authMiddleware = new Elysia({ name: "auth-middleware" }).derive(
-  async ({ headers }): Promise<{ user: JWTPayload | null }> => {
-    const authorization = headers.authorization;
-    if (!authorization?.startsWith("Bearer ")) {
-      return { user: null };
-    }
+export const authMiddleware = new Elysia({ name: "auth-middleware" })
+  .derive(
+    { as: "global" },
+    async ({ headers }): Promise<{ user: JWTPayload | null }> => {
+      const authorization = headers.authorization;
+      if (!authorization?.startsWith("Bearer ")) {
+        return { user: null };
+      }
 
-    try {
-      const token = authorization.slice(7);
-      const user = await verifyToken(token);
-      return { user };
-    } catch {
-      return { user: null };
+      try {
+        const token = authorization.slice(7);
+        const user = await verifyToken(token);
+        return { user };
+      } catch {
+        return { user: null };
+      }
     }
-  }
-);
+  );
 
 export const requireAuth = new Elysia({ name: "require-auth" })
   .use(authMiddleware)
