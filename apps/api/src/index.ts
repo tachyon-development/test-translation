@@ -7,6 +7,7 @@ import { wsRoutes } from "./routes/ws";
 import { analyticsRoutes } from "./routes/analytics";
 import { healthRoutes } from "./routes/health";
 import { adminRoutes } from "./routes/admin";
+import { integrationRoutes } from "./routes/integrations";
 
 const app = new Elysia()
   .use(cors({ origin: (process.env.CORS_ORIGINS ?? "http://localhost:80").split(",") }))
@@ -18,6 +19,7 @@ const app = new Elysia()
   .use(analyticsRoutes)
   .use(healthRoutes)
   .use(adminRoutes)
+  .use(integrationRoutes)
   .listen(Number(process.env.API_PORT) || 4000);
 
 console.log(`API running on port ${app.server?.port}`);
