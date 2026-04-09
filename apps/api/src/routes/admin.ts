@@ -73,7 +73,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/org" })
           )
           .limit(1);
 
-        if (!dept || dept.orgId !== user?.orgId ?? "") {
+        if (!dept || dept.orgId !== (user?.orgId ?? "")) {
           set.status = 404;
           return { error: "Department not found" };
         }
