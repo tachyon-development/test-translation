@@ -273,16 +273,25 @@ export function createClassificationWorker() {
         },
       });
 
-      // 12. Publish to org and department channels
+      // 12. Publish to org and department channels (include full workflow for real-time UI)
       const workflowPayload = JSON.stringify({
         type: "workflow.created",
-        workflowId: workflow.id,
-        requestId,
-        department: dept.name,
-        departmentId: dept.id,
-        priority: result.urgency,
-        summary: result.summary,
-        slaDeadline: slaDeadline.toISOString(),
+        workflow: {
+          ...workflow,
+          department: dept,
+          request: {
+            id: requestId,
+            originalText: text,
+            translated: result.translated,
+            originalLang: "detected",
+          },
+          aiClassification: {
+            summary: result.summary,
+            confidence: 0.85,
+            urgency: result.urgency,
+            aiCategory: result.department,
+          },
+        },
       });
 
       await pubRedis.publish(`org:${orgId}:workflows`, workflowPayload);
