@@ -3,7 +3,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { WorkflowCard } from "./WorkflowCard";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Inbox } from "lucide-react";
+import { Inbox, HelpCircle } from "lucide-react";
+import { useState } from "react";
 import type { Workflow } from "@/hooks/useWebSocket";
 
 interface KanbanBoardProps {
@@ -17,13 +18,14 @@ interface Column {
   key: ColumnKey;
   label: string;
   accentClass: string;
+  description: string;
 }
 
 const columns: Column[] = [
-  { key: "pending", label: "Pending", accentClass: "text-[var(--status-pending,#8a7fb5)]" },
-  { key: "claimed", label: "Claimed", accentClass: "text-[var(--status-info,#6b8cae)]" },
-  { key: "in_progress", label: "In Progress", accentClass: "text-[var(--status-warning,#c9a84c)]" },
-  { key: "escalated", label: "Escalated", accentClass: "text-[var(--status-danger,#c17767)]" },
+  { key: "pending", label: "Pending", accentClass: "text-[var(--status-pending,#8a7fb5)]", description: "New requests waiting to be picked up by staff. AI has classified and routed them to the correct department." },
+  { key: "claimed", label: "Claimed", accentClass: "text-[var(--status-info,#6b8cae)]", description: "A staff member has claimed this request and is preparing to handle it. The guest has been notified." },
+  { key: "in_progress", label: "In Progress", accentClass: "text-[var(--status-warning,#c9a84c)]", description: "Staff is actively working on resolving this request. The guest can see the real-time status." },
+  { key: "escalated", label: "Escalated", accentClass: "text-[var(--status-danger,#c17767)]", description: "SLA deadline was missed. This has been escalated to a manager for immediate attention." },
 ];
 
 const priorityOrder: Record<string, number> = {
@@ -82,6 +84,12 @@ export function KanbanBoard({ workflows, onCardClick }: KanbanBoardProps) {
               >
                 {col.label}
               </h3>
+              <div className="group relative">
+                <HelpCircle className="h-3.5 w-3.5 cursor-help text-[var(--text-secondary)] opacity-40 hover:opacity-80 transition-opacity" />
+                <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-[var(--bg-elevated)] p-3 text-xs text-[var(--text-secondary)] opacity-0 shadow-xl backdrop-blur-xl transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                  <p className="font-sans font-normal leading-relaxed">{col.description}</p>
+                </div>
+              </div>
               <span
                 className={`
                   inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5
