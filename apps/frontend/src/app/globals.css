@@ -19,6 +19,14 @@
   --sla-high: #f59e0b;
   --sla-medium: #4a9eff;
   --sla-low: #22c55e;
+
+  /* Kiosk palette */
+  --accent: #d4a574;
+  --status-success: #7c9885;
+  --status-warning: #c9a84c;
+  --status-danger: #c17767;
+  --status-info: #6b8cae;
+  --status-pending: #8a7fb5;
 }
 
 body {
