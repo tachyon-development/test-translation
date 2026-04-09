@@ -156,7 +156,6 @@ export function WorkflowDetail({
             headers,
             body: JSON.stringify({ status: "resolved" }),
           });
-          handleOpenChange(false);
           break;
         case "escalate":
           await apiRequest(`/api/workflows/${workflow.id}/escalate`, {
@@ -165,8 +164,8 @@ export function WorkflowDetail({
           });
           break;
       }
-      // Refresh events
-      await fetchDetail(workflow.id);
+      // Close panel after action so user sees the kanban update
+      setTimeout(() => handleOpenChange(false), 600);
     } catch (err) {
       console.error("Action failed:", err);
     } finally {
