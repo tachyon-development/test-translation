@@ -1,23 +1,24 @@
 sequenceDiagram
     actor Guest
-    participant FE as Frontend
-    participant API as Elysia API
+    participant FE as Frontend (Vercel)
+    participant API as Elysia API (Railway)
     participant Redis
     participant Worker
-    participant Whisper
-    participant Ollama
+    participant Whisper as Whisper :8000
+    participant Groq as Groq Cloud API
+    participant Ollama as Ollama (fallback)
     participant PG as PostgreSQL
     actor Staff
 
-    Guest->>FE: Records voice (any language)
-    FE->>API: POST /api/requests/voice
+    Guest->>FE: Tap-to-record voice (any language)
+    FE->>API: POST /api/requests/voice (base64 audio)
     API->>PG: INSERT request (queued)
-    API->>Redis: Enqueue → transcription
+    API->>Redis: Enqueue → transcription (base64 payload)
     API-->>FE: { request_id }
     FE->>API: Opens SSE stream
 
     Redis->>Worker: Dequeue transcription
-    Worker->>Whisper: POST /transcribe
+    Worker->>Whisper: POST /transcribe (base64 audio)
     Whisper-->>Worker: { text, lang, confidence }
     Worker->>PG: INSERT transcription
     Worker->>Redis: Publish status update
@@ -25,8 +26,11 @@ sequenceDiagram
 
     Worker->>Redis: Enqueue → classification
     Redis->>Worker: Dequeue classification
-    Worker->>Ollama: POST /api/generate
-    Ollama-->>Worker: { department, urgency, summary }
+    Worker->>Groq: POST /chat/completions (~500ms)
+    alt Groq unavailable (circuit breaker)
+        Worker->>Ollama: POST /api/generate (fallback)
+    end
+    Groq-->>Worker: { department, urgency, summary }
     Worker->>PG: INSERT classification + workflow
     Worker->>Redis: Publish to staff channels
     API-->>FE: "Routed to Maintenance ✓"

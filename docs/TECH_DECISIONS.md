@@ -28,11 +28,21 @@ Justifications for every major technology choice in HospiQ, including the trade-
 
 ---
 
-## AI: Ollama (local llama3) + Whisper.cpp (local)
+## AI Classification: Groq Cloud (Primary) + Ollama (Fallback)
 
-**Why:** No API keys required to run the demo. Complete privacy — guest data never leaves the server. Judges can run the full system with `docker compose up` without signing up for anything.
+**Why:** Production classification uses the Groq cloud API (`llama-3.1-8b-instant`) via `https://api.groq.com/openai/v1/chat/completions`. Classification completes in ~500ms — compared to 1-2 minutes on CPU-only Ollama. This makes the guest experience feel near-instant. Ollama remains deployed on Railway as a fallback for when Groq is unavailable, and as the default for local development and air-gapped environments.
 
-**Trade-off:** Slower inference than cloud APIs. Lower model quality than GPT-4/Claude. Mitigated by: (1) the task is classification, not open-ended generation — smaller models handle this well, (2) queue-based architecture absorbs latency, (3) in production, swap for cloud API with the same interface.
+**Circuit breaker:** The system uses a tiered fallback: Groq -> Ollama -> manual_review. If Groq fails 3 consecutive times, the circuit breaker opens and routes to Ollama. If Ollama also fails, requests are flagged for manual staff review.
+
+**Trade-off:** Groq introduces an external dependency and sends request text to a third-party API. Mitigated by: (1) Groq's OpenAI-compatible API means swapping providers is trivial, (2) Ollama fallback ensures the system never stops functioning, (3) for privacy-sensitive deployments, set Ollama as primary.
+
+---
+
+## Speech-to-Text: Faster Whisper on Railway
+
+**Why:** Runs as `fedirz/faster-whisper-server:latest-cpu` on port 8000 on Railway. Voice audio is passed as base64 through the BullMQ job queue rather than written to the filesystem, which simplifies the architecture and avoids shared volume mounts between services.
+
+**Trade-off:** Base64 encoding increases payload size by ~33%. Acceptable because voice clips are short (typically < 30 seconds) and the BullMQ queue handles the serialization cleanly.
 
 ---
 
@@ -49,6 +59,18 @@ Justifications for every major technology choice in HospiQ, including the trade-
 **Why:** Single Redis instance serves four concerns (queue, pub/sub, cache, timers) — operational simplicity. BullMQ provides reliable job processing with retries, backoff, delayed jobs (SLA timers), and dead letter queues out of the box. Simpler than RabbitMQ/Kafka for our message patterns.
 
 **Trade-off:** Redis is single-threaded. At extreme scale, Kafka would provide better throughput and durability. For 1000+ orgs with moderate request volume, Redis handles this comfortably. Horizontal scaling path: Redis Cluster.
+
+---
+
+## Deployment: Vercel (Frontend) + Railway (Backend)
+
+**Why:** Vercel provides edge CDN, zero-config Next.js deployment, and automatic preview deployments on PRs — ideal for the frontend. Railway provides managed Docker containers with built-in Postgres and Redis provisioning — ideal for the backend services (API, Worker, Ollama, Whisper). This split lets each layer scale independently with the right tool.
+
+**Production URLs:**
+- Frontend: `https://hospiq-eight.vercel.app`
+- Backend: Railway (API, Worker, Postgres, Redis, Ollama, Whisper)
+
+**Trade-off:** Split deployment adds operational complexity vs. a single Docker Compose. Justified by: (1) Vercel's CDN gives global latency benefits for the frontend, (2) Railway's managed services reduce ops burden for databases, (3) Docker Compose remains available for local development.
 
 ---
 
