@@ -3,9 +3,10 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { submitTextRequest } from "@/lib/api";
+import { submitTextRequest, submitVoiceRequest } from "@/lib/api";
 import { useSSE, type SSEEvent } from "@/hooks/useSSE";
 import { RoomSelector } from "@/components/kiosk/RoomSelector";
+import { VoiceRecorder } from "@/components/kiosk/VoiceRecorder";
 import { ProgressStepper } from "@/components/kiosk/ProgressStepper";
 import { FeedbackPrompt } from "@/components/kiosk/FeedbackPrompt";
 import { Wifi, WifiOff, X } from "lucide-react";
@@ -238,6 +239,34 @@ function KioskInner() {
     }
   }, [room, requestText, showToast]);
 
+  const handleVoiceComplete = useCallback(
+    async (audioBlob: Blob) => {
+      if (!/^\d{3}$/.test(room)) {
+        setRoomError("Please enter a 3-digit room number");
+        return;
+      }
+
+      setSubmitting(true);
+
+      try {
+        const { request_id } = await submitVoiceRequest({
+          audio: audioBlob,
+          room_number: room,
+          org_id: ORG_ID,
+        });
+        setRequestId(request_id);
+        setViewState("processing");
+        setCurrentStep(0);
+        setStatusMessage("Transcribing your request...");
+      } catch {
+        showToast("Could not submit your voice request. Please try again.", true);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [room, showToast]
+  );
+
   const handleReset = () => {
     setViewState("input");
     setRequestId(null);
@@ -298,6 +327,38 @@ function KioskInner() {
                 error={roomError}
               />
 
+              {/* Voice Recorder */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  delay: 0.25,
+                }}
+                className="w-full"
+              >
+                <VoiceRecorder
+                  onRecordingComplete={handleVoiceComplete}
+                  disabled={submitting}
+                />
+              </motion.div>
+
+              {/* Divider */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="flex w-full items-center gap-4"
+              >
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs tracking-widest uppercase text-[var(--text-muted)]">
+                  or type your request
+                </span>
+                <div className="h-px flex-1 bg-white/10" />
+              </motion.div>
+
               {/* Request Text Area */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
@@ -306,16 +367,10 @@ function KioskInner() {
                   type: "spring",
                   stiffness: 300,
                   damping: 30,
-                  delay: 0.3,
+                  delay: 0.35,
                 }}
                 className="w-full"
               >
-                <label
-                  htmlFor="request-text"
-                  className="mb-2 block text-sm tracking-wide text-[var(--text-secondary)]"
-                >
-                  How can we assist you?
-                </label>
                 <textarea
                   id="request-text"
                   rows={4}
@@ -334,7 +389,7 @@ function KioskInner() {
                   type: "spring",
                   stiffness: 300,
                   damping: 30,
-                  delay: 0.4,
+                  delay: 0.45,
                 }}
                 className="w-full"
               >
