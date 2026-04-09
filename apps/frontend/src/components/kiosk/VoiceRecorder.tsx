@@ -84,9 +84,17 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
   // to false while in "processing", reset. Actually, the simplest approach: reset on the next
   // successful recording complete. The parent transitions to processing view anyway.
 
+  const toggleRecording = useCallback(() => {
+    if (recordingState === "idle") {
+      startRecording();
+    } else if (recordingState === "recording") {
+      stopRecording();
+    }
+  }, [recordingState, startRecording, stopRecording]);
+
   const stateLabel: Record<RecordingState, string> = {
-    idle: "Hold to speak",
-    recording: "Recording...",
+    idle: "Tap to speak",
+    recording: "Tap to stop",
     processing: "Processing...",
   };
 
@@ -121,12 +129,7 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
 
         <motion.button
           type="button"
-          onMouseDown={startRecording}
-          onMouseUp={stopRecording}
-          onMouseLeave={isRecording ? cancelRecording : undefined}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
-          onTouchCancel={cancelRecording}
+          onClick={toggleRecording}
           disabled={disabled || recordingState === "processing"}
           whileTap={{ scale: 0.95 }}
           className={`
@@ -144,7 +147,7 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
                 : "cursor-pointer"
             }
           `}
-          aria-label={isRecording ? "Release to stop recording" : "Hold to start recording"}
+          aria-label={isRecording ? "Tap to stop recording" : "Tap to start recording"}
         >
           {/* Idle pulse glow */}
           {!isRecording && recordingState === "idle" && !disabled && (
