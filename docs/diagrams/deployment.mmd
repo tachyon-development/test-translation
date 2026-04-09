@@ -1,0 +1,11 @@
+graph LR
+    GH["GitHub Repository"] -->|"push"| VERCEL["Vercel<br/>Frontend CDN"]
+    GH -->|"railway up"| RAILWAY["Railway<br/>Backend Services"]
+
+    VERCEL --> EDGE["Edge Network<br/>Global CDN"]
+    RAILWAY --> API_SVC["API Service"]
+    RAILWAY --> WORKER_SVC["Worker Service"]
+    RAILWAY --> PG_SVC["Managed Postgres"]
+    RAILWAY --> REDIS_SVC["Managed Redis"]
+    RAILWAY --> OLLAMA_SVC["Ollama Container"]
+    RAILWAY --> WHISPER_SVC["Whisper Container"]

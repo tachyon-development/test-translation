@@ -29,55 +29,7 @@ The architecture follows a clear separation of concerns: a Next.js frontend on V
 
 The following diagram shows the complete system topology, from external clients through the frontend CDN, API layer, background workers, AI services, and data stores.
 
-```mermaid
-graph TB
-    subgraph External["External Clients"]
-        GK["Guest Kiosk / Mobile<br/><i>Guests submit requests via<br/>voice or text in any language</i>"]
-        SD["Staff Dashboard<br/><i>Hotel staff claim & resolve<br/>requests in real-time</i>"]
-        MD["Manager Dashboard<br/><i>Operations analytics, SLA<br/>monitoring & escalation</i>"]
-        AD["Admin Panel<br/><i>Configure departments, users,<br/>rooms & integrations</i>"]
-    end
-
-    subgraph Cloud["Cloud AI Services"]
-        GROQ["Groq Cloud API<br/>llama-3.1-8b-instant<br/><i>~500ms classification — translates any<br/>language to English, detects department<br/>(maintenance/kitchen/etc) & urgency level</i>"]
-    end
-
-    subgraph Vercel["Vercel — Frontend Hosting"]
-        FE["Next.js Frontend<br/>shadcn/ui + D3.js + framer-motion<br/><i>Server-rendered pages, edge CDN,<br/>zero-config deployment. Serves all<br/>4 user interfaces from one app.</i>"]
-    end
-
-    subgraph Railway["Railway — Backend Infrastructure"]
-        API["Elysia API Server<br/>Bun runtime, port 4000<br/><i>REST endpoints + WebSocket (staff real-time)<br/>+ SSE (guest progress). Stateless — handles<br/>auth, routing, CRUD. Doesn't do AI work.</i>"]
-
-        WK["BullMQ Workers ×2<br/>Bun runtime<br/><i>Background job processors. Picks up<br/>transcription & classification jobs from<br/>Redis queue. Calls Whisper & Groq/Ollama.<br/>Creates workflows & publishes events.</i>"]
-
-        WH["Whisper (faster-whisper-server)<br/>CPU inference, port 8000<br/><i>Speech-to-text. Converts voice recordings<br/>to text in any language. Needed because<br/>guests speak Mandarin, Spanish, Japanese<br/>etc — must transcribe before classifying.</i>"]
-
-        OL["Ollama (llama3 fallback)<br/>CPU inference, port 11434<br/><i>Local LLM fallback when Groq is down.<br/>Circuit breaker pattern: Groq fails 3x →<br/>falls back to Ollama → fails again →<br/>manual review by staff.</i>"]
-
-        PG["PostgreSQL 16<br/>Primary database<br/><i>All persistent data: users, departments,<br/>requests, workflows, events, audit log.<br/>Row Level Security ensures tenants<br/>can never see each other's data.</i>"]
-
-        RD["Redis 7<br/>4 roles in one service<br/><i>1) Job Queue — BullMQ stores pending<br/>transcription/classification jobs<br/>2) Pub/Sub — pushes real-time events<br/>to WebSocket & SSE connections<br/>3) Cache — dashboard KPIs (10s TTL)<br/>4) Timers — delayed SLA escalation jobs</i>"]
-    end
-
-    GK -->|"HTTPS"| FE
-    SD -->|"HTTPS + WSS"| FE
-    MD -->|"HTTPS + WSS"| FE
-    AD -->|"HTTPS"| FE
-
-    FE -->|"/api/* → proxy"| API
-
-    API -->|"enqueue jobs"| RD
-    API -->|"read/write data"| PG
-    API <-->|"pub/sub events"| RD
-
-    WK -->|"dequeue jobs"| RD
-    WK -->|"classify text (~500ms)"| GROQ
-    WK -.->|"fallback classify (~90s)"| OL
-    WK -->|"transcribe voice"| WH
-    WK -->|"store results"| PG
-    WK -->|"publish events"| RD
-```
+![System Architecture](diagrams/architecture.png)
 
 ### Service Layer Responsibilities
 
@@ -240,360 +192,31 @@ graph TB
 
 A guest types a request in any language. The API stores the request, enqueues a classification job, and the worker calls Groq to translate, classify, and route it. The guest receives real-time progress via SSE; staff see a new card appear on the Kanban board via WebSocket.
 
-```mermaid
-sequenceDiagram
-    actor Guest as Guest Browser
-    participant Vercel as Vercel (Next.js)
-    participant API as Elysia API (Railway)
-    participant PG as PostgreSQL
-    participant Redis as Redis (BullMQ + Pub/Sub)
-    participant Worker as Worker (Bun)
-    participant Groq as Groq Cloud API
-    actor Staff as Staff Browser
-
-    Note over Guest,Staff: Text Request — Full Lifecycle
-
-    Guest->>Vercel: Types request in any language
-    Vercel->>API: POST /api/requests {text, room, org_id}
-    API->>PG: INSERT INTO requests (status: queued, source: text)
-    PG-->>API: request_id
-    API->>Redis: BullMQ.add("classification", {request_id, text, org_id})
-    Redis-->>API: job_id
-    API-->>Vercel: 201 {request_id}
-    Vercel->>API: GET /api/requests/:id/stream (SSE connection opened)
-    API->>Redis: SUBSCRIBE request:{request_id}:status
-
-    Note over Redis,Groq: Worker picks up classification job
-
-    Redis->>Worker: BullMQ dequeue "classification" job
-    Worker->>Groq: POST /openai/v1/chat/completions<br/>{model: llama-3.1-8b-instant, messages: [...]}
-    Groq-->>Worker: {department, urgency, summary_en, language}
-
-    Note over Worker,PG: Persist classification results
-
-    Worker->>PG: INSERT INTO classifications (department, urgency, summary_en, confidence)
-    Worker->>PG: INSERT INTO workflows (status: open, sla_deadline: NOW + SLA minutes)
-    Worker->>PG: INSERT INTO workflow_events (type: created)
-    Worker->>PG: UPDATE requests SET status = 'classified'
-
-    Note over Worker,Staff: Fan out real-time notifications
-
-    Worker->>Redis: PUBLISH org:{org_id}:workflows {type: new_workflow, workflow}
-    Worker->>Redis: PUBLISH org:{org_id}:dept:{dept_id} {type: new_workflow, workflow}
-    Worker->>Redis: PUBLISH request:{request_id}:status {type: classified, department, summary}
-    Worker->>Redis: BullMQ.add("sla_timer", {workflow_id}, {delay: SLA_ms})
-
-    Redis-->>API: Pub/sub event on org:{org_id}:workflows
-    API->>Staff: WebSocket push → new workflow card appears
-
-    Redis-->>API: Pub/sub event on request:{request_id}:status
-    API-->>Vercel: SSE event: {status: classified, department, summary}
-    Vercel-->>Guest: "Routed to Maintenance — Juan's team notified"
-```
+![Text Request Flow](diagrams/text-request-flow.png)
 
 ### 4.2 Voice Request Flow
 
 A guest records a voice message in any language. The flow adds a transcription phase (via Whisper) before classification. The guest sees two progress steps: "transcribed" then "classified."
 
-```mermaid
-sequenceDiagram
-    actor Guest as Guest Browser
-    participant MR as MediaRecorder API
-    participant Vercel as Vercel (Next.js)
-    participant API as Elysia API (Railway)
-    participant PG as PostgreSQL
-    participant Redis as Redis (BullMQ + Pub/Sub)
-    participant Worker as Worker (Bun)
-    participant Whisper as faster-whisper-server :8000
-    participant Groq as Groq Cloud API
-    actor Staff as Staff Browser
-
-    Note over Guest,Staff: Voice Request — Full Lifecycle (any language)
-
-    Guest->>MR: Tap-to-record (holds microphone button)
-    MR->>MR: Capture audio via MediaRecorder (webm/opus)
-    Guest->>MR: Release button (stop recording)
-    MR-->>Vercel: Audio Blob ready
-    Vercel->>API: POST /api/requests/voice {audio: base64, room, org_id}
-
-    API->>PG: INSERT INTO requests (status: queued, source: voice)
-    PG-->>API: request_id
-    API->>Redis: BullMQ.add("transcription", {request_id, audio_base64, org_id})
-    Redis-->>API: job_id
-    API-->>Vercel: 201 {request_id}
-    Vercel->>API: GET /api/requests/:id/stream (SSE connection opened)
-    API->>Redis: SUBSCRIBE request:{request_id}:status
-
-    Note over Redis,Whisper: Phase 1 — Transcription
-
-    Redis->>Worker: BullMQ dequeue "transcription" job
-    Worker->>Worker: Decode base64 → audio buffer
-    Worker->>Whisper: POST /v1/audio/transcriptions<br/>{file: audio_buffer, response_format: json}
-    Whisper-->>Worker: {text, language, duration}
-
-    Worker->>PG: INSERT INTO transcriptions (text, language, confidence, duration)
-    Worker->>PG: UPDATE requests SET status = 'transcribed'
-    Worker->>Redis: PUBLISH request:{request_id}:status {type: transcribed, language}
-    Redis-->>API: Pub/sub event on request:{request_id}:status
-    API-->>Vercel: SSE event: {status: transcribed, language}
-    Vercel-->>Guest: "Transcribed (detected: Mandarin)"
-
-    Note over Redis,Groq: Phase 2 — Classification (same as text flow)
-
-    Worker->>Redis: BullMQ.add("classification", {request_id, text, org_id})
-    Redis->>Worker: BullMQ dequeue "classification" job
-    Worker->>Groq: POST /openai/v1/chat/completions<br/>{model: llama-3.1-8b-instant, messages: [...]}
-    Groq-->>Worker: {department, urgency, summary_en, language}
-
-    Worker->>PG: INSERT INTO classifications (department, urgency, summary_en, confidence)
-    Worker->>PG: INSERT INTO workflows (status: open, sla_deadline: NOW + SLA minutes)
-    Worker->>PG: INSERT INTO workflow_events (type: created)
-    Worker->>PG: UPDATE requests SET status = 'classified'
-
-    Note over Worker,Staff: Fan out real-time notifications
-
-    Worker->>Redis: PUBLISH org:{org_id}:workflows {type: new_workflow, workflow}
-    Worker->>Redis: PUBLISH org:{org_id}:dept:{dept_id} {type: new_workflow, workflow}
-    Worker->>Redis: PUBLISH request:{request_id}:status {type: classified, department, summary}
-    Worker->>Redis: BullMQ.add("sla_timer", {workflow_id}, {delay: SLA_ms})
-
-    Redis-->>API: Pub/sub event on org:{org_id}:workflows
-    API->>Staff: WebSocket push → new workflow card appears
-
-    Redis-->>API: Pub/sub event on request:{request_id}:status
-    API-->>Vercel: SSE event: {status: classified, department, summary}
-    Vercel-->>Guest: "Routed to Maintenance — Juan's team notified"
-```
+![Voice Request Flow](diagrams/voice-request-flow.png)
 
 ### 4.3 Staff Claim & Resolve Flow
 
 Staff connect via WebSocket and receive a snapshot of active workflows. When a staff member claims a workflow, other staff see the card move in real-time, and the guest receives a progress update via SSE.
 
-```mermaid
-sequenceDiagram
-    actor Staff as Staff Browser
-    participant WS as WebSocket Connection
-    participant API as Elysia API (Railway)
-    participant PG as PostgreSQL
-    participant Redis as Redis (BullMQ + Pub/Sub)
-    actor OtherStaff as Other Staff Browsers
-    participant SSE as SSE Connection
-    actor Guest as Guest Browser
-
-    Note over Staff,Guest: Staff connects and receives initial state
-
-    Staff->>API: WebSocket upgrade /ws/dashboard {org_id, dept_id, token}
-    API->>PG: SELECT workflows WHERE org_id = ? AND status IN ('open','claimed')
-    PG-->>API: workflow[]
-    API->>Redis: SUBSCRIBE org:{org_id}:workflows
-    API->>Redis: SUBSCRIBE org:{org_id}:dept:{dept_id}
-    API->>Staff: WebSocket → snapshot {workflows: [...]}
-
-    Note over Staff,Guest: Staff claims a workflow
-
-    Staff->>API: POST /workflows/:id/claim {staff_id}
-    API->>PG: SELECT workflow WHERE id = ? FOR UPDATE
-    PG-->>API: workflow (status: open)
-    API->>PG: UPDATE workflows SET status = 'claimed', claimed_by = staff_id, claimed_at = NOW()
-    API->>PG: INSERT INTO workflow_events (type: claimed, actor: staff_id)
-    API-->>Staff: 200 {workflow}
-
-    API->>Redis: PUBLISH org:{org_id}:workflows {type: claimed, workflow_id, staff_name}
-    API->>Redis: PUBLISH request:{request_id}:status {type: claimed, staff_name}
-
-    Redis-->>API: Pub/sub on org:{org_id}:workflows
-    API->>OtherStaff: WebSocket → card moves to "Claimed" column
-    API->>Staff: WebSocket → card moves to "Claimed" column (own view)
-
-    Redis-->>API: Pub/sub on request:{request_id}:status
-    API-->>SSE: SSE event: {status: claimed, staff_name}
-    SSE-->>Guest: "Juan is on the way"
-
-    Note over Staff,Guest: Staff resolves the workflow
-
-    Staff->>API: PATCH /workflows/:id/status {status: resolved, resolution_note}
-    API->>PG: UPDATE workflows SET status = 'resolved', resolved_at = NOW()
-    API->>PG: INSERT INTO workflow_events (type: resolved, actor: staff_id, note: resolution_note)
-    API-->>Staff: 200 {workflow}
-
-    API->>Redis: PUBLISH org:{org_id}:workflows {type: resolved, workflow_id}
-    API->>Redis: PUBLISH request:{request_id}:status {type: resolved}
-    API->>Redis: BullMQ.remove("sla_timer", {workflow_id})
-
-    Redis-->>API: Pub/sub on org:{org_id}:workflows
-    API->>OtherStaff: WebSocket → card removed from board
-    API->>Staff: WebSocket → card moves to "Resolved"
-
-    Redis-->>API: Pub/sub on request:{request_id}:status
-    API-->>SSE: SSE event: {status: resolved}
-    SSE-->>Guest: "Resolved! Your faucet has been fixed."
-```
+![Staff Claim and Resolve Flow](diagrams/staff-claim-flow.png)
 
 ### 4.4 SLA Escalation Flow
 
 When a workflow is created, a delayed BullMQ job is scheduled at the SLA deadline. If the workflow is still unresolved when the timer fires, the system escalates to Tier 1 (staff alert + manager notification). A second timer fires 15 minutes later for Tier 2 escalation.
 
-```mermaid
-sequenceDiagram
-    participant Redis as Redis (BullMQ + Pub/Sub)
-    participant Worker as Worker (Bun)
-    participant PG as PostgreSQL
-    participant API as Elysia API (Railway)
-    participant WS as WebSocket Connections
-    participant SSE as SSE Connection
-    actor Staff as Staff Browser
-    actor Manager as Manager Browser
-    actor Guest as Guest Browser
-
-    Note over Redis,Guest: Workflow was created with SLA timer
-
-    Note right of Redis: BullMQ delayed job<br/>delay = SLA minutes (e.g. 30min)
-    Note over Redis,Guest: ... time passes — SLA deadline reached ...
-
-    Redis->>Worker: BullMQ fires delayed "sla_timer" job {workflow_id}
-
-    Worker->>PG: SELECT workflow WHERE id = ? (check current status)
-    PG-->>Worker: workflow {status, escalation_tier, claimed_by}
-
-    alt Workflow already resolved
-        Worker->>Worker: No-op — discard job
-    else Workflow still open or claimed (Tier 1 Escalation)
-        Worker->>PG: UPDATE workflows SET escalation_tier = 1, escalated_at = NOW()
-        Worker->>PG: INSERT INTO workflow_events (type: sla_breach, sla_minutes)
-        Worker->>PG: INSERT INTO workflow_events (type: escalated, tier: 1)
-
-        Worker->>Redis: PUBLISH org:{org_id}:workflows {type: escalated, tier: 1, workflow_id}
-        Worker->>Redis: PUBLISH org:{org_id}:managers {type: sla_breach, workflow_id}
-        Worker->>Redis: PUBLISH request:{request_id}:status {type: escalated}
-
-        Redis-->>API: Pub/sub on org:{org_id}:workflows
-        API->>Staff: WebSocket → card turns red, SLA badge shows "BREACHED"
-
-        Redis-->>API: Pub/sub on org:{org_id}:managers
-        API->>Manager: WebSocket → escalation alert banner + sound
-
-        Redis-->>API: Pub/sub on request:{request_id}:status
-        API-->>SSE: SSE event: {status: escalated}
-        SSE-->>Guest: "We're prioritizing your request"
-
-        Note over Worker,Redis: Schedule Tier 2 escalation
-
-        Worker->>Redis: BullMQ.add("sla_timer_t2", {workflow_id}, {delay: 15min})
-
-        Note over Redis,Guest: ... 15 more minutes pass — Tier 2 ...
-
-        Redis->>Worker: BullMQ fires "sla_timer_t2" job {workflow_id}
-        Worker->>PG: SELECT workflow WHERE id = ? (check current status)
-        PG-->>Worker: workflow {status, escalation_tier}
-
-        alt Still unresolved
-            Worker->>PG: UPDATE workflows SET escalation_tier = 2
-            Worker->>PG: INSERT INTO workflow_events (type: escalated, tier: 2)
-            Worker->>Redis: PUBLISH org:{org_id}:managers {type: tier2_escalation, workflow_id}
-            Redis-->>API: Pub/sub on org:{org_id}:managers
-            API->>Manager: WebSocket → Tier 2 alert — "Unresolved 45+ min"
-        end
-    end
-```
+![SLA Escalation Flow](diagrams/sla-escalation-flow.png)
 
 ### 4.5 Circuit Breaker Flow
 
 The circuit breaker protects against cascading failures when the primary AI service (Groq) is unavailable. After 3 consecutive failures, the circuit opens and all requests route to Ollama. After 30 seconds, a single probe request tests if Groq has recovered.
 
-```mermaid
-sequenceDiagram
-    participant Redis as Redis (BullMQ)
-    participant Worker as Worker (Bun)
-    participant CB as Circuit Breaker
-    participant Groq as Groq Cloud API
-    participant Ollama as Ollama (Railway)
-    participant PG as PostgreSQL
-    participant PubSub as Redis Pub/Sub
-    actor Staff as Staff Browser
-
-    Note over Redis,Staff: Normal operation — Circuit Breaker CLOSED
-
-    Redis->>Worker: Dequeue "classification" job
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: CLOSED (healthy)
-    Worker->>Groq: POST /openai/v1/chat/completions
-    Groq-->>Worker: 500 Internal Server Error
-
-    Worker->>CB: Record failure (count: 1/3)
-    Worker->>Redis: BullMQ retry with exponential backoff
-
-    Note over Worker,Groq: Retry attempt 2
-
-    Redis->>Worker: Retry "classification" job (after backoff)
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: CLOSED (1 failure)
-    Worker->>Groq: POST /openai/v1/chat/completions
-    Groq-->>Worker: 503 Service Unavailable
-
-    Worker->>CB: Record failure (count: 2/3)
-    Worker->>Redis: BullMQ retry with exponential backoff
-
-    Note over Worker,Groq: Retry attempt 3
-
-    Redis->>Worker: Retry "classification" job (after backoff)
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: CLOSED (2 failures)
-    Worker->>Groq: POST /openai/v1/chat/completions
-    Groq-->>Worker: Timeout (no response)
-
-    Worker->>CB: Record failure (count: 3/3) → STATE: OPEN
-    Note right of CB: Circuit OPEN<br/>All Groq requests blocked<br/>for 30 seconds
-
-    Note over Redis,Staff: Fallback to Ollama
-
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: OPEN — skip Groq
-    Worker->>Ollama: POST /api/generate {model: llama3, prompt: ...}
-    Ollama-->>Worker: {department, urgency, summary_en}
-
-    Worker->>PG: INSERT classification (provider: ollama)
-    Worker->>PG: INSERT workflow, INSERT workflow_events
-    Worker->>PubSub: PUBLISH org + request channels
-    Note right of Worker: Request handled successfully via fallback
-
-    Note over Redis,Staff: Next request — still in OPEN state
-
-    Redis->>Worker: Dequeue new "classification" job
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: OPEN — skip Groq
-    Worker->>Ollama: POST /api/generate
-    Ollama-->>Worker: 500 Error — Ollama also down
-
-    Note right of Worker: Both AI services unavailable
-
-    Worker->>PG: UPDATE requests SET status = 'manual_review'
-    Worker->>PG: INSERT INTO workflows (status: manual_review)
-    Worker->>PG: INSERT INTO workflow_events (type: manual_review_required)
-    Worker->>PubSub: PUBLISH org:{org_id}:workflows {type: manual_review, workflow_id}
-
-    PubSub-->>Staff: WebSocket → card shows "Needs Manual Classification" badge
-
-    Note over CB,Groq: 30 seconds later — HALF_OPEN probe
-
-    CB->>CB: Timer expires → STATE: HALF_OPEN
-    Note right of CB: Allow single test request
-
-    Redis->>Worker: Dequeue next "classification" job
-    Worker->>CB: Check Groq circuit state
-    CB-->>Worker: HALF_OPEN — allow one test request
-    Worker->>Groq: POST /openai/v1/chat/completions (probe request)
-
-    alt Groq responds successfully
-        Groq-->>Worker: {department, urgency, summary_en}
-        Worker->>CB: Record success → STATE: CLOSED
-        Note right of CB: Circuit CLOSED<br/>Groq restored as primary
-        Worker->>PG: INSERT classification (provider: groq)
-    else Groq still failing
-        Groq-->>Worker: Error
-        Worker->>CB: Record failure → STATE: OPEN (reset 30s timer)
-        Worker->>Ollama: POST /api/generate (fallback again)
-    end
-```
+![Circuit Breaker Flow](diagrams/circuit-breaker-flow.png)
 
 ---
 
@@ -601,38 +224,7 @@ sequenceDiagram
 
 HospiQ is designed with no single point of failure for user-facing functionality. Every external dependency has a fallback path, and every background job has retry semantics.
 
-```mermaid
-graph TB
-    subgraph "AI Classification — 3-Tier Fallback"
-        GROQ["Groq Cloud API<br/>Primary (~500ms)"]
-        OLLAMA["Ollama on Railway<br/>Fallback (~90s)"]
-        MANUAL["Manual Staff Review<br/>Last resort"]
-
-        GROQ -->|"3 failures"| OLLAMA
-        OLLAMA -->|"also fails"| MANUAL
-        OLLAMA -->|"30s recovery"| GROQ
-    end
-
-    subgraph "Real-Time — Graceful Degradation"
-        WS["WebSocket<br/>Primary"]
-        SSE["SSE<br/>Guest fallback"]
-        POLL["HTTP Polling<br/>Last resort"]
-
-        WS -->|"connection drops"| WS
-        SSE -->|"auto-reconnect"| SSE
-        POLL -->|"manual refresh"| POLL
-    end
-
-    subgraph "Data — No Single Point of Failure"
-        PG["PostgreSQL<br/>Source of truth"]
-        REDIS["Redis<br/>Cache + Queue"]
-        BULLMQ["BullMQ<br/>Retry + DLQ"]
-
-        REDIS -->|"down"| PG
-        BULLMQ -->|"job fails"| BULLMQ
-        BULLMQ -->|"max retries"| DLQ["Dead Letter Queue"]
-    end
-```
+![Redundancy and Fault Tolerance](diagrams/redundancy.png)
 
 ### Fault Tolerance Matrix
 
@@ -653,20 +245,7 @@ graph TB
 
 ## 6. Security Architecture
 
-```mermaid
-graph LR
-    subgraph "Auth Flow"
-        LOGIN["POST /api/auth/login"] --> JWT["JWT Token<br/>(1h expiry)"]
-        JWT --> API["API validates on every request"]
-        API --> RLS["PostgreSQL RLS<br/>org_id isolation"]
-    end
-
-    subgraph "Data Protection"
-        PII["Guest PII"] --> ENCRYPT["pgcrypto encryption at rest"]
-        CORS["CORS"] --> ORIGINS["Whitelist: Vercel domain only"]
-        REDIS_AUTH["Redis"] --> PASS["requirepass authentication"]
-    end
-```
+![Security Architecture](diagrams/security.png)
 
 ### JWT Authentication
 
@@ -773,19 +352,7 @@ Side-by-side video clips recorded via Playwright's video capture against the liv
 
 ## 9. Deployment Architecture
 
-```mermaid
-graph LR
-    GH["GitHub Repository"] -->|"push"| VERCEL["Vercel<br/>Frontend CDN"]
-    GH -->|"railway up"| RAILWAY["Railway<br/>Backend Services"]
-
-    VERCEL --> EDGE["Edge Network<br/>Global CDN"]
-    RAILWAY --> API_SVC["API Service"]
-    RAILWAY --> WORKER_SVC["Worker Service"]
-    RAILWAY --> PG_SVC["Managed Postgres"]
-    RAILWAY --> REDIS_SVC["Managed Redis"]
-    RAILWAY --> OLLAMA_SVC["Ollama Container"]
-    RAILWAY --> WHISPER_SVC["Whisper Container"]
-```
+![Deployment Architecture](diagrams/deployment.png)
 
 ### Production URLs
 
