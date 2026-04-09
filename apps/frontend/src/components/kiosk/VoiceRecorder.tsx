@@ -132,7 +132,7 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
           className={`
             relative z-10 flex items-center justify-center rounded-full
             transition-all duration-300 select-none
-            h-16 w-16 sm:h-20 sm:w-20
+            h-14 w-14 sm:h-20 sm:w-20
             ${
               isRecording
                 ? "bg-gradient-to-br from-[#d4a574] to-[#b8865a] shadow-[0_0_40px_rgba(212,165,116,0.5)]"

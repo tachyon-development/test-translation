@@ -55,7 +55,7 @@ export function KPICard({
   }, [delay]);
 
   const isPositive = delta !== undefined && delta >= 0;
-  const deltaColor = isPositive ? "#7c9885" : "#c17767";
+  const deltaColor = isPositive ? "var(--status-success)" : "var(--status-danger)";
   const arrow = isPositive ? "\u25B2" : "\u25BC";
 
   return (
@@ -63,7 +63,7 @@ export function KPICard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay, duration: 0.4, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-xl border border-white/[0.06] p-6"
+      className="relative overflow-hidden rounded-xl border border-white/[0.06] p-3 sm:p-6"
       style={{
         background:
           "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",

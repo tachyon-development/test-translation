@@ -207,12 +207,12 @@ export function WorkflowCard({ workflow, onClick, index = 0 }: WorkflowCardProps
               <SLACountdown deadline={new Date(workflow.slaDeadline)} size="sm" />
             )}
             {workflow.department && (
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="hidden sm:inline text-[10px] text-[var(--text-muted)]">
                 {workflow.department.name}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-[family-name:var(--font-mono)] text-[var(--text-muted)]">
+          <span className="hidden sm:inline text-[10px] font-[family-name:var(--font-mono)] text-[var(--text-muted)]">
             {Math.round(confidence * 100)}%
           </span>
         </div>

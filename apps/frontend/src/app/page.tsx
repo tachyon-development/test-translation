@@ -398,7 +398,7 @@ function KioskInner() {
                   whileTap={{ scale: 0.98 }}
                   disabled={submitting || !requestText.trim()}
                   onClick={handleSubmit}
-                  className="w-full rounded-xl bg-gradient-to-r from-[#d4a574] to-[#c4956a] px-8 py-4 text-base font-medium tracking-wide text-[#1a1a2e] shadow-[0_0_40px_-8px_rgba(212,165,116,0.35)] transition-all duration-300 hover:shadow-[0_0_60px_-8px_rgba(212,165,116,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                  className="w-full rounded-xl bg-gradient-to-r from-[var(--accent)] to-[var(--accent-dark)] px-8 py-4 text-base font-medium tracking-wide text-[#1a1a2e] shadow-[0_0_40px_-8px_rgba(212,165,116,0.35)] transition-all duration-300 hover:shadow-[0_0_60px_-8px_rgba(212,165,116,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
                 >
                   {submitting ? (
                     <motion.span

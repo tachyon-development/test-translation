@@ -99,7 +99,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div
+      className="flex min-h-screen items-center justify-center p-4"
+      style={{
+        background:
+          "radial-gradient(ellipse 50% 40% at 50% 40%, rgba(212,165,116,0.04) 0%, transparent 70%)",
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -108,7 +114,7 @@ export default function LoginPage() {
       >
         {/* Logo / Header */}
         <div className="mb-8 text-center">
-          <h1 className="font-display text-4xl font-bold text-[var(--text-primary)]">
+          <h1 className="font-display text-4xl font-semibold text-[var(--text-primary)]">
             Hospi<span className="text-[var(--accent,#d4a574)]">Q</span>
           </h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
@@ -183,7 +189,7 @@ export default function LoginPage() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleDemoLogin(account.email)}
                   disabled={loading}
-                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-3 text-left transition-colors hover:border-white/10 hover:bg-white/5 disabled:opacity-50"
                 >
                   <account.icon className="h-3.5 w-3.5 shrink-0 text-[var(--accent,#d4a574)]" />
                   <div className="min-w-0">

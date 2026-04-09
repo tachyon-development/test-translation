@@ -94,6 +94,19 @@ function Connector({ filled }: { filled: boolean }) {
   );
 }
 
+function MobileDot({ status }: { status: "pending" | "active" | "complete" }) {
+  const bg =
+    status === "complete"
+      ? "bg-[var(--status-success)]"
+      : status === "active"
+        ? "bg-[var(--accent)]"
+        : "bg-[var(--text-muted)]/30";
+
+  return (
+    <div className={`h-4 w-4 rounded-full ${bg} ${status === "active" ? "ring-2 ring-[var(--accent)]/40" : ""}`} />
+  );
+}
+
 export function ProgressStepper({ currentStep, steps }: ProgressStepperProps) {
   return (
     <motion.div
@@ -102,53 +115,77 @@ export function ProgressStepper({ currentStep, steps }: ProgressStepperProps) {
       transition={{ duration: 0.4 }}
       className="w-full max-w-sm"
     >
-      {steps.map((step, i) => {
-        const status: "pending" | "active" | "complete" =
-          i < currentStep ? "complete" : i === currentStep ? "active" : "pending";
-
-        return (
-          <motion.div
-            key={step.label}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 30,
-              delay: i * 0.2,
-            }}
-          >
-            <div className="flex items-center gap-4">
-              <StepCircle status={status} />
-              <div className="flex flex-col">
-                <span
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    status === "complete"
-                      ? "text-[var(--status-success)]"
-                      : status === "active"
-                        ? "text-[var(--accent)]"
-                        : "text-[var(--text-muted)]"
-                  }`}
-                >
-                  {step.label}
-                </span>
-                {step.detail && status === "active" && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="font-mono text-xs text-[var(--text-secondary)]"
-                  >
-                    {step.detail}
-                  </motion.span>
-                )}
-              </div>
+      {/* Mobile horizontal dots (below sm) */}
+      <div className="flex items-center justify-center gap-2 sm:hidden">
+        {steps.map((step, i) => {
+          const status: "pending" | "active" | "complete" =
+            i < currentStep ? "complete" : i === currentStep ? "active" : "pending";
+          return (
+            <div key={step.label} className="flex items-center gap-2">
+              <MobileDot status={status} />
+              {i < steps.length - 1 && (
+                <div
+                  className="h-0.5 w-4"
+                  style={{
+                    backgroundColor: i < currentStep ? "var(--status-success)" : "rgba(107,107,128,0.3)",
+                  }}
+                />
+              )}
             </div>
-            {i < steps.length - 1 && (
-              <Connector filled={i < currentStep} />
-            )}
-          </motion.div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Desktop vertical layout (sm and above) */}
+      <div className="hidden sm:block">
+        {steps.map((step, i) => {
+          const status: "pending" | "active" | "complete" =
+            i < currentStep ? "complete" : i === currentStep ? "active" : "pending";
+
+          return (
+            <motion.div
+              key={step.label}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                delay: i * 0.2,
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <StepCircle status={status} />
+                <div className="flex flex-col">
+                  <span
+                    className={`text-sm font-medium transition-colors duration-300 ${
+                      status === "complete"
+                        ? "text-[var(--status-success)]"
+                        : status === "active"
+                          ? "text-[var(--accent)]"
+                          : "text-[var(--text-muted)]"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  {step.detail && status === "active" && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="font-mono text-xs text-[var(--text-secondary)]"
+                    >
+                      {step.detail}
+                    </motion.span>
+                  )}
+                </div>
+              </div>
+              {i < steps.length - 1 && (
+                <Connector filled={i < currentStep} />
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
     </motion.div>
   );
 }

@@ -201,7 +201,7 @@ export function WorkflowDetail({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="w-[450px] max-w-[90vw] overflow-hidden border-l border-white/10 bg-[var(--bg-secondary)]/95 backdrop-blur-xl p-0"
+        className="w-full sm:w-[450px] sm:max-w-[90vw] h-full overflow-hidden border-l border-white/10 bg-[var(--bg-secondary)]/95 backdrop-blur-xl p-0"
       >
         {workflow && (
           <div className="flex h-full flex-col">
@@ -342,7 +342,7 @@ export function WorkflowDetail({
             </ScrollArea>
 
             {/* Actions footer */}
-            <div className="border-t border-white/5 p-4 space-y-3">
+            <div className="sticky bottom-0 border-t border-white/5 p-4 space-y-3 bg-[var(--bg-secondary)]/95 backdrop-blur-xl">
               {/* Comment input */}
               <div className="flex gap-2">
                 <Input

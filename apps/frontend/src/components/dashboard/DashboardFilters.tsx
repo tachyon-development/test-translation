@@ -28,13 +28,13 @@ export function DashboardFilters({
   departments,
 }: DashboardFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
       {/* Department filter */}
       <Select
         value={filters.department}
         onValueChange={(val) => onChange({ ...filters, department: val })}
       >
-        <SelectTrigger className="w-[180px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+        <SelectTrigger className="w-full sm:w-[180px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
           <SelectValue placeholder="All Departments" />
         </SelectTrigger>
         <SelectContent>
@@ -52,7 +52,7 @@ export function DashboardFilters({
         value={filters.priority}
         onValueChange={(val) => onChange({ ...filters, priority: val })}
       >
-        <SelectTrigger className="w-[140px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+        <SelectTrigger className="w-full sm:w-[140px] bg-[var(--bg-secondary)] text-[var(--text-primary)]">
           <SelectValue placeholder="All Priorities" />
         </SelectTrigger>
         <SelectContent>
@@ -71,7 +71,7 @@ export function DashboardFilters({
           placeholder="Search room or request..."
           value={filters.search}
           onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          className="w-[220px] bg-[var(--bg-secondary)] pl-8 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+          className="w-full sm:w-[220px] bg-[var(--bg-secondary)] pl-8 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
         />
       </div>
     </div>

@@ -27,6 +27,7 @@
   --status-danger: #c17767;
   --status-info: #6b8cae;
   --status-pending: #8a7fb5;
+  --accent-dark: #c4956a;
 
   /* Dashboard — priority left-border colors */
   --priority-low: #5a6e5f;
@@ -87,4 +88,30 @@ body {
 }
 .font-mono {
   font-family: var(--font-mono, monospace);
+}
+
+/* Focus-visible indicators (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Dark backgrounds need visible focus */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion (WCAG AA) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .shimmer {
+    animation: none;
+  }
 }
