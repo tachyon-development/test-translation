@@ -43,11 +43,8 @@ export const wsRoutes = new Elysia().ws("/ws/dashboard", {
     await sub.subscribe(...channels);
 
     sub.on("message", (_channel: string, message: string) => {
-      try {
-        ws.send(JSON.parse(message));
-      } catch {
-        ws.send(message);
-      }
+      // Send raw JSON string — don't double-parse/serialize
+      ws.send(message);
     });
 
     // Send snapshot of active workflows

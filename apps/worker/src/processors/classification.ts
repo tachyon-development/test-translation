@@ -260,7 +260,7 @@ export function createClassificationWorker() {
           slaDeadline,
           status: "pending",
         })
-        .returning({ id: schema.workflows.id });
+        .returning();
 
       // 11. INSERT workflow_event (created)
       await db.insert(schema.workflowEvents).values({
