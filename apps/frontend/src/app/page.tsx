@@ -18,7 +18,7 @@ const STEPS = [
   { label: "Transcribing" },
   { label: "Understanding" },
   { label: "Routing" },
-  { label: "Assigned" },
+  { label: "Team Notified" },
   { label: "Resolved" },
 ];
 
@@ -33,7 +33,7 @@ function mapEventToStep(event: SSEEvent): number {
     case "classified":
       return 2;
     case "routed":
-      return 3;
+      return 4; // Skip straight to "Assigned" — staff will be notified
     case "resolved":
       return 5;
     default:
@@ -206,7 +206,7 @@ function KioskInner() {
     }
 
     if (latestEvent.type === "routed") {
-      setStatusMessage(`Routed to ${latestEvent.department || "the right team"}. Help is on the way!`);
+      setStatusMessage(`${latestEvent.department || "Our team"} has been notified and someone will be with you shortly.`);
     }
 
     if (latestEvent.message) {
