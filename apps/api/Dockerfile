@@ -2,7 +2,7 @@
 FROM oven/bun:1 AS build
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/db/package.json ./packages/db/
 
