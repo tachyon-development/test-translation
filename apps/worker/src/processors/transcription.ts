@@ -97,7 +97,7 @@ export function createTranscriptionWorker() {
       // 3. INSERT transcription record
       await db.insert(schema.transcriptions).values({
         requestId,
-        audioUrl: audioPath,
+        audioUrl: "voice-recording",
         sourceLang: language,
         transcript,
         confidence: 0.9, // Whisper doesn't always return confidence

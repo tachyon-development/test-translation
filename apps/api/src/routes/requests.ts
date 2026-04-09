@@ -137,6 +137,7 @@ export const requestRoutes = new Elysia({ prefix: "/api/requests" })
     const requestId = params.id;
     const channel = `request:${requestId}:status`;
 
+    const cleanupRef: { fn?: () => void } = {};
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
@@ -168,20 +169,15 @@ export const requestRoutes = new Elysia({ prefix: "/api/requests" })
           }
         }, 15_000);
 
-        // Cleanup when stream closes
-        const cleanup = () => {
+        // Store cleanup in outer scope for cancel
+        cleanupRef.fn = () => {
           clearInterval(heartbeat);
           redisSub.off("message", messageHandler);
           redisSub.unsubscribe(channel);
         };
-
-        // Store cleanup for cancel
-        (controller as unknown as Record<string, unknown>).__cleanup = cleanup;
       },
-      cancel(controller) {
-        const cleanup = (controller as unknown as Record<string, unknown>)
-          .__cleanup as (() => void) | undefined;
-        cleanup?.();
+      cancel() {
+        cleanupRef.fn?.();
       },
     });
 
