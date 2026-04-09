@@ -1,0 +1,12 @@
+stateDiagram-v2
+    [*] --> CLOSED
+    CLOSED --> OPEN: 3 consecutive failures
+    OPEN --> HALF_OPEN: 30s timeout elapsed
+    HALF_OPEN --> CLOSED: Test request succeeds
+    HALF_OPEN --> OPEN: Test request fails
+
+    CLOSED: Normal operation
+    CLOSED: Requests pass through to AI service
+    OPEN: Requests short-circuited
+    OPEN: Fallback to manual_review
+    HALF_OPEN: Single test request allowed

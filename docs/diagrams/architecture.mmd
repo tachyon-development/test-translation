@@ -1,0 +1,56 @@
+graph TB
+    subgraph External["External Clients"]
+        GK["Guest Kiosk / Mobile"]
+        SD["Staff Dashboard"]
+        MD["Manager Dashboard"]
+        AD["Admin Panel"]
+    end
+
+    subgraph Docker["Docker Compose — 10 Services"]
+        subgraph Gateway["Gateway Layer"]
+            NG["nginx :80<br/>Reverse Proxy"]
+        end
+
+        subgraph Application["Application Layer"]
+            FE["frontend :3000<br/>Next.js + shadcn/ui"]
+            API["api :4000<br/>Elysia + Bun<br/>REST + WebSocket + SSE"]
+            WK["worker ×2<br/>Bun + BullMQ"]
+        end
+
+        subgraph AI["AI Layer"]
+            OL["ollama :11434<br/>llama3"]
+            WH["whisper :8080<br/>Speech-to-Text"]
+        end
+
+        subgraph Data["Data Layer"]
+            PG["postgres :5432<br/>PostgreSQL 16 + RLS"]
+            RD["redis :6379<br/>Queue + Pub/Sub + Cache"]
+        end
+
+        subgraph Observability["Observability"]
+            LK["loki :3100"]
+            GF["grafana :3001"]
+        end
+    end
+
+    GK -->|"HTTPS"| NG
+    SD -->|"HTTPS + WSS"| NG
+    MD -->|"HTTPS + WSS"| NG
+    AD -->|"HTTPS"| NG
+
+    NG -->|"/"| FE
+    NG -->|"/api/*"| API
+    NG -->|"/ws/*"| API
+
+    API -->|"enqueue"| RD
+    API -->|"read/write"| PG
+    API <-->|"pub/sub"| RD
+
+    WK -->|"dequeue"| RD
+    WK -->|"HTTP"| OL
+    WK -->|"HTTP"| WH
+    WK -->|"read/write"| PG
+    WK -->|"publish"| RD
+
+    GF -->|"query"| LK
+    GF -->|"query"| PG

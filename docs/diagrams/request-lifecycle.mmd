@@ -1,0 +1,38 @@
+sequenceDiagram
+    actor Guest
+    participant FE as Frontend
+    participant API as Elysia API
+    participant Redis
+    participant Worker
+    participant Whisper
+    participant Ollama
+    participant PG as PostgreSQL
+    actor Staff
+
+    Guest->>FE: Records voice (any language)
+    FE->>API: POST /api/requests/voice
+    API->>PG: INSERT request (queued)
+    API->>Redis: Enqueue → transcription
+    API-->>FE: { request_id }
+    FE->>API: Opens SSE stream
+
+    Redis->>Worker: Dequeue transcription
+    Worker->>Whisper: POST /transcribe
+    Whisper-->>Worker: { text, lang, confidence }
+    Worker->>PG: INSERT transcription
+    Worker->>Redis: Publish status update
+    API-->>FE: "Transcribed ✓"
+
+    Worker->>Redis: Enqueue → classification
+    Redis->>Worker: Dequeue classification
+    Worker->>Ollama: POST /api/generate
+    Ollama-->>Worker: { department, urgency, summary }
+    Worker->>PG: INSERT classification + workflow
+    Worker->>Redis: Publish to staff channels
+    API-->>FE: "Routed to Maintenance ✓"
+
+    Redis-->>API: Pub/sub event
+    API->>Staff: WebSocket push (new workflow card)
+    Staff->>API: POST /workflows/:id/claim
+    API->>Redis: Publish update
+    API-->>FE: "Juan is on the way"
