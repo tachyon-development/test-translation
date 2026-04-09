@@ -260,6 +260,7 @@ export default function DemoPage() {
           {roles.map((role) => (
             <motion.button
               key={role.key}
+              data-testid="role-card"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{

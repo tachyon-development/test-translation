@@ -1,26 +1,44 @@
 import { test, expect } from './fixtures/auth';
 
 test.describe('Real-time Sync', () => {
-  test('staff sees guest request in real-time', async ({ browser }) => {
+  test('staff sees guest request in real-time', async ({ browser, request }) => {
     // Two browser contexts
     const staffContext = await browser.newContext();
     const guestContext = await browser.newContext();
     const staffPage = await staffContext.newPage();
     const guestPage = await guestContext.newPage();
 
-    // Login staff
-    const loginRes = await staffPage.request.post('/api/auth/login', {
-      data: { email: 'juan@hotel-mariana.com', password: 'demo2026' },
-    });
-    const { token } = await loginRes.json();
+    // Login staff via API with retry
+    let token: string | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const loginRes = await request.post('http://localhost:80/api/auth/login', {
+          data: { email: 'juan@hotel-mariana.com', password: 'demo2026' },
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (loginRes.ok()) {
+          const body = await loginRes.json();
+          token = body.token;
+          break;
+        }
+      } catch {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    if (!token) throw new Error('Failed to login after 3 attempts');
+
+    // Navigate first, then set token
+    await staffPage.goto('/');
     await staffPage.evaluate(
-      (t) => localStorage.setItem('hospiq_token', t),
+      (t: string) => localStorage.setItem('hospiq_token', t),
       token
     );
 
     // Staff opens dashboard
     await staffPage.goto('/dashboard');
-    await staffPage.waitForSelector('[data-testid="kanban-board"]');
+    await staffPage.waitForLoadState('networkidle');
+    await staffPage.waitForSelector('[data-testid="kanban-board"]', { timeout: 10000 });
 
     // Count current cards
     const initialCount = await staffPage

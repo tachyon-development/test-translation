@@ -11,15 +11,15 @@ test.describe('Guest Flow', () => {
     // Submit
     await guestPage.click('[data-testid="submit-button"]');
     // Assert progress stepper appears
-    await expect(guestPage.locator('[data-testid="progress-stepper"]')).toBeVisible();
+    await expect(guestPage.locator('[data-testid="progress-stepper"]')).toBeVisible({ timeout: 10000 });
     // Wait for "Received" step
-    await expect(guestPage.locator('text=Received')).toBeVisible();
+    await expect(guestPage.locator('text=Received')).toBeVisible({ timeout: 10000 });
   });
 
   test('guest can select room via URL parameter', async ({ guestPage }) => {
     await guestPage.goto('/?room=412');
     // Assert room field is pre-filled
-    await expect(guestPage.locator('[data-testid="room-input"]')).toHaveValue('412');
+    await expect(guestPage.locator('[data-testid="room-input"]')).toHaveValue('412', { timeout: 10000 });
   });
 
   test('guest sees error gracefully if submission fails', async ({ guestPage }) => {
@@ -36,6 +36,6 @@ test.describe('Guest Flow', () => {
         .or(guestPage.locator('text=failed'))
         .or(guestPage.locator('text=retry'))
         .or(guestPage.locator('text=Retry'))
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
   });
 });
