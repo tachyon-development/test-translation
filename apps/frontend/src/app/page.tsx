@@ -202,10 +202,10 @@ function KioskInner() {
     }
   }, [latestEvent]);
 
-  // Inline room validation on blur
+  // Inline room validation on blur — only show error if they typed something invalid
   const validateRoom = useCallback((value: string) => {
-    if (value && !/^\d{3}$/.test(value)) {
-      setRoomError("Please enter a 3-digit room number");
+    if (value.length > 0 && value.length < 3) {
+      setRoomError("Room number must be 3 digits");
     } else {
       setRoomError("");
     }
@@ -323,7 +323,7 @@ function KioskInner() {
               {/* Room Selector */}
               <RoomSelector
                 value={room}
-                onChange={(v) => { setRoom(v); if (roomError) validateRoom(v); }}
+                onChange={(v) => { setRoom(v); setRoomError(""); }}
                 error={roomError}
               />
 
