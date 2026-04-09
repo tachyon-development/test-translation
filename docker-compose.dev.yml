@@ -3,13 +3,13 @@ services:
     volumes:
       - ./apps/api/src:/app/apps/api/src
       - ./packages:/app/packages
-    command: bun --watch apps/api/src/index.ts
+    command: bun --watch src/index.ts
 
   worker:
     volumes:
       - ./apps/worker/src:/app/apps/worker/src
       - ./packages:/app/packages
-    command: bun --watch apps/worker/src/index.ts
+    command: bun --watch src/index.ts
 
   frontend:
     volumes:

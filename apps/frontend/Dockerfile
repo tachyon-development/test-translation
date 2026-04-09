@@ -16,14 +16,12 @@ RUN bun run build
 
 # -- runtime stage --
 FROM oven/bun:1-slim AS runtime
-WORKDIR /app/apps/frontend
+WORKDIR /app
 
-COPY --from=build /app/apps/frontend/.next ./.next
-COPY --from=build /app/apps/frontend/public ./public
-COPY --from=build /app/apps/frontend/package.json ./
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/package.json /app/
+COPY --from=build /app/apps/frontend/.next/standalone ./
+COPY --from=build /app/apps/frontend/.next/static ./apps/frontend/.next/static
+COPY --from=build /app/apps/frontend/public ./apps/frontend/public
 
 EXPOSE 3000
 
-CMD ["bun", "run", "start"]
+CMD ["node", "apps/frontend/server.js"]
