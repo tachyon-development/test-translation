@@ -212,20 +212,17 @@ function KioskInner() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    // Validate
-    if (!/^\d{3}$/.test(room)) {
-      setRoomError("Please enter a 3-digit room number");
-      return;
-    }
     if (!requestText.trim()) return;
 
+    // Default to room 101 (Lobby) if no room specified
+    const roomNumber = room.length === 3 ? room : "101";
     setRoomError("");
     setSubmitting(true);
 
     try {
       const { request_id } = await submitTextRequest({
         text: requestText.trim(),
-        room_number: room,
+        room_number: roomNumber,
         org_id: ORG_ID,
       });
       setRequestId(request_id);
