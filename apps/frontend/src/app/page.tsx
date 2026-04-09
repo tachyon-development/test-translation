@@ -324,25 +324,23 @@ function KioskInner() {
                 error={roomError}
               />
 
-              {/* Voice Recorder — only shown when Whisper is available (local dev) */}
-              {!process.env.NEXT_PUBLIC_API_URL && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                    delay: 0.25,
-                  }}
-                  className="w-full"
-                >
-                  <VoiceRecorder
-                    onRecordingComplete={handleVoiceComplete}
-                    disabled={submitting}
-                  />
-                </motion.div>
-              )}
+              {/* Voice Recorder */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  delay: 0.25,
+                }}
+                className="w-full"
+              >
+                <VoiceRecorder
+                  onRecordingComplete={handleVoiceComplete}
+                  disabled={submitting}
+                />
+              </motion.div>
 
               {/* Divider */}
               <motion.div

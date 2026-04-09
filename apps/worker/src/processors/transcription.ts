@@ -11,8 +11,11 @@ const WHISPER_URL = process.env.WHISPER_URL || "http://whisper:8080";
 
 interface TranscriptionJob {
   requestId: string;
-  audioPath: string;
+  audioBase64: string;
+  audioMimeType?: string;
   orgId: string;
+  // Legacy field for local dev
+  audioPath?: string;
 }
 
 export function createTranscriptionWorker() {
@@ -38,7 +41,7 @@ export function createTranscriptionWorker() {
   const worker = new Worker<TranscriptionJob>(
     "transcription",
     async (job: Job<TranscriptionJob>) => {
-      const { requestId, audioPath, orgId } = job.data;
+      const { requestId, audioBase64, audioMimeType, orgId } = job.data;
       console.log(`Transcribing request ${requestId}`);
 
       // 1. Publish "transcribing" status
@@ -51,9 +54,11 @@ export function createTranscriptionWorker() {
       let whisperData: { text: string; language?: string };
       try {
         whisperData = await whisperBreaker.execute(async () => {
-          const audioFile = Bun.file(audioPath);
+          // Decode base64 audio from job queue
+          const audioBuffer = Buffer.from(audioBase64, "base64");
+          const audioBlob = new Blob([audioBuffer], { type: audioMimeType || "audio/webm" });
           const formData = new FormData();
-          formData.append("file", audioFile, "audio.webm");
+          formData.append("file", audioBlob, "audio.webm");
           formData.append("model", "whisper-1");
 
           const whisperRes = await fetch(

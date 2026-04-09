@@ -76,25 +76,26 @@ export const requestRoutes = new Elysia({ prefix: "/api/requests" })
         return { error: "Room not found" };
       }
 
-      // Save audio to /tmp
-      const audioPath = `/tmp/hospiq-audio-${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
-      await Bun.write(audioPath, audio);
+      // Convert audio to base64 for passing through the job queue
+      // (API and worker run in separate containers, can't share /tmp)
+      const audioBuffer = await audio.arrayBuffer();
+      const audioBase64 = Buffer.from(audioBuffer).toString("base64");
 
-      // INSERT request with status "queued", audioUrl
+      // INSERT request with status "queued"
       const [request] = await db
         .insert(schema.requests)
         .values({
           orgId: org_id,
           roomId: room.id,
-          audioUrl: audioPath,
           status: "queued",
         })
         .returning({ id: schema.requests.id });
 
-      // Enqueue to transcription queue
+      // Enqueue to transcription queue with audio data inline
       await transcriptionQueue.add("transcribe", {
         requestId: request.id,
-        audioPath,
+        audioBase64,
+        audioMimeType: audio.type || "audio/webm",
         orgId: org_id,
       });
 
