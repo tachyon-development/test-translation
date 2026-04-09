@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations";
+import { departments } from "./departments";
 import { userRoleEnum } from "./enums";
 
 export const users = pgTable("users", {
@@ -10,8 +11,7 @@ export const users = pgTable("users", {
     .references(() => organizations.id),
   name: text("name"),
   role: userRoleEnum("role").notNull(),
-  // Plain uuid to avoid circular import with departments
-  departmentId: uuid("department_id"),
+  departmentId: uuid("department_id").references(() => departments.id),
   email: text("email").notNull(),
   passwordHash: text("password_hash"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -21,5 +21,9 @@ export const usersRelations = relations(users, ({ one }) => ({
   organization: one(organizations, {
     fields: [users.orgId],
     references: [organizations.id],
+  }),
+  department: one(departments, {
+    fields: [users.departmentId],
+    references: [departments.id],
   }),
 }));
