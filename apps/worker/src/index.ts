@@ -1,13 +1,33 @@
-import { Worker } from "bullmq";
-import IORedis from "ioredis";
-
-const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
-  maxRetriesPerRequest: null,
-});
-
-connection.on("error", (err) => {
-  console.error("Redis connection error:", err);
-});
+import { createTranscriptionWorker } from "./processors/transcription";
+import { createClassificationWorker } from "./processors/classification";
+import { createEscalationWorker } from "./processors/escalation";
+import { createNotificationWorker } from "./processors/notification";
 
 console.log("Worker starting...");
-// Placeholder — processors added later
+
+const transcriptionWorker = createTranscriptionWorker();
+const classificationWorker = createClassificationWorker();
+const escalationWorker = createEscalationWorker();
+const notificationWorker = createNotificationWorker();
+
+console.log("All workers registered:");
+console.log("  - transcription (concurrency: 2)");
+console.log("  - classification (concurrency: 3)");
+console.log("  - escalation-check (concurrency: 5)");
+console.log("  - notification (concurrency: 10)");
+
+// Graceful shutdown on SIGTERM
+const shutdown = async () => {
+  console.log("Shutting down workers...");
+  await Promise.all([
+    transcriptionWorker.close(),
+    classificationWorker.close(),
+    escalationWorker.close(),
+    notificationWorker.close(),
+  ]);
+  console.log("All workers stopped.");
+  process.exit(0);
+};
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
