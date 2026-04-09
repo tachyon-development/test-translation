@@ -10,6 +10,7 @@ type SlaConfig = {
   critical: number;
 };
 import { buildClassifyPrompt } from "../prompts/classify";
+import { matchDepartment } from "../lib/matchDepartment";
 import {
   CircuitBreaker,
   CircuitOpenError,
@@ -190,13 +191,7 @@ export function createClassificationWorker() {
       const result: ClassifyResult = JSON.parse(jsonMatch[0]);
 
       // 6. Find matching department (exact match, then slug match, then fuzzy)
-      const deptLower = result.department.toLowerCase().trim();
-      const matchedDept =
-        departments.find((d) => d.name.toLowerCase() === deptLower) ||
-        departments.find((d) => d.slug.toLowerCase() === deptLower) ||
-        departments.find((d) => deptLower.includes(d.slug.toLowerCase())) ||
-        departments.find((d) => d.name.toLowerCase().includes(deptLower)) ||
-        departments.find((d) => deptLower.includes(d.name.toLowerCase().split(" ")[0]));
+      const matchedDept = matchDepartment(result.department, departments);
 
       if (!matchedDept) {
         console.warn(
