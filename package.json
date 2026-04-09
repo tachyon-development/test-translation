@@ -1,0 +1,12 @@
+{
+  "name": "hospiq",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "db:generate": "bun --filter @hospiq/db drizzle-kit generate",
+    "db:migrate": "bun --filter @hospiq/db drizzle-kit migrate",
+    "db:seed": "bun --filter @hospiq/db run seed",
+    "db:push": "bun --filter @hospiq/db drizzle-kit push"
+  }
+}

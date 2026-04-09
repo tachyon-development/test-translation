@@ -1,0 +1,17 @@
+{
+  "name": "@hospiq/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.2.0",
+    "@elysiajs/cors": "^1.2.0",
+    "@hospiq/db": "workspace:*",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "jose": "^6.0.0"
+  }
+}

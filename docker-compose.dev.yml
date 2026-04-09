@@ -1,0 +1,18 @@
+services:
+  api:
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages:/app/packages
+    command: bun --watch apps/api/src/index.ts
+
+  worker:
+    volumes:
+      - ./apps/worker/src:/app/apps/worker/src
+      - ./packages:/app/packages
+    command: bun --watch apps/worker/src/index.ts
+
+  frontend:
+    volumes:
+      - ./apps/frontend/src:/app/apps/frontend/src
+      - ./apps/frontend/public:/app/apps/frontend/public
+    command: bun run next dev --turbopack
