@@ -5,13 +5,13 @@
 
 ---
 
-## What Was Built
+## What I Built
 
 A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language. Within seconds, the AI translates their words, understands what they need (maintenance? room service? concierge?), and routes it to the right team. Staff see it appear instantly on their dashboard. The guest watches the progress in real-time on their phone.
 
 ---
 
-## How We Meet the Four Core Requirements
+## How It Meets the Four Core Requirements
 
 ### 1. Real-Time Input Processing
 
@@ -30,7 +30,7 @@ The AI does three things in a single prompt:
 - **Classifies** which department should handle it (Maintenance, Housekeeping, Kitchen, Concierge, or Front Desk)
 - **Assesses urgency** (low, medium, high, critical) which determines the SLA deadline
 
-We currently use **Groq's cloud API** running `llama-3.1-8b-instant`, which returns results in ~500ms. The AI layer is behind a simple interface — swapping to a self-hosted model, OpenAI, Anthropic, or any OpenAI-compatible API is a one-line config change. No vendor lock-in.
+I currently use **Groq's cloud API** running `llama-3.1-8b-instant`, which returns results in ~500ms. The AI layer is behind a simple interface — swapping to a self-hosted model, OpenAI, Anthropic, or any OpenAI-compatible API is a one-line config change. No vendor lock-in.
 
 If the AI provider is unavailable, a **circuit breaker** automatically falls back to a local Ollama instance. If that also fails, the request is flagged for **manual staff review** — the system never stops working.
 
@@ -65,9 +65,9 @@ The real-time layer works through **Redis Pub/Sub**. When a worker creates a wor
 
 - **Frontend on Vercel** — Global CDN means the guest kiosk loads fast anywhere in the world. One Next.js app serves all four views (guest, staff, manager, admin).
 
-- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. **Workers** are separate background processes that do the heavy lifting — they pick up jobs from a queue (transcribe audio, call the AI, create workflows) so the API stays fast and responsive. Think of it like a restaurant: the API is the host who takes your order, and the workers are the kitchen staff who actually prepare the food. We run **multiple workers** so if one goes down, the others keep processing. Need to handle more volume? Just add more workers — no code changes needed.
+- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. **Workers** are separate background processes that do the heavy lifting — they pick up jobs from a queue (transcribe audio, call the AI, create workflows) so the API stays fast and responsive. Think of it like a restaurant: the API is the host who takes your order, and the workers are the kitchen staff who actually prepare the food. I run **multiple workers** so if one goes down, the others keep processing. Need to handle more volume? Just add more workers — no code changes needed.
 
-- **AI Classification (Groq)** — Currently using Groq's cloud API for fast classification (~500ms). The AI layer is abstracted behind a simple interface — we can swap to our own self-hosted model, OpenAI, Anthropic, or any provider with a one-line configuration change. No vendor lock-in.
+- **AI Classification (Groq)** — Currently using Groq's cloud API for fast classification (~500ms). The AI layer is abstracted behind a simple interface — I can swap to a self-hosted model, OpenAI, Anthropic, or any provider with a one-line configuration change. No vendor lock-in.
 
 - **Whisper for Voice** — Converts speech to text in any language. Runs as its own service so voice processing doesn't slow down text requests.
 
@@ -79,7 +79,7 @@ The real-time layer works through **Redis Pub/Sub**. When a worker creates a wor
 
 ## Key Decisions
 
-| Decision | What We Chose | Why |
+| Decision | What I Chose | Why |
 |----------|--------------|-----|
 | **AI Provider** | Groq cloud (swappable) | ~500ms classification; can switch to self-hosted or any OpenAI-compatible API |
 | **Real-time** | WebSocket + SSE | Staff get two-way live updates; guests receive progress via lightweight SSE |
