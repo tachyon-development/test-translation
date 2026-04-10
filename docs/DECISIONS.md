@@ -21,7 +21,7 @@ A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language
 
 - **Frontend on Vercel** — Global CDN means the guest kiosk loads fast anywhere in the world. One Next.js app serves all four views (guest, staff, manager, admin).
 
-- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. Workers run separately so slow AI processing never blocks the API. We run **multiple workers for redundancy** — if one crashes, the others keep processing. Adding more workers is a single config change.
+- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. **Workers** are separate background processes that do the heavy lifting — they pick up jobs from a queue (transcribe audio, call the AI, create workflows) so the API stays fast and responsive. Think of it like a restaurant: the API is the host who takes your order, and the workers are the kitchen staff who actually prepare the food. We run **multiple workers** so if one goes down, the others keep processing. Need to handle more volume? Just add more workers — no code changes needed.
 
 - **AI Classification (Groq)** — Currently using Groq's cloud API for fast classification (~500ms). The AI layer is abstracted behind a simple interface — we can swap to our own self-hosted model, OpenAI, Anthropic, or any provider with a one-line configuration change. No vendor lock-in.
 
@@ -43,7 +43,7 @@ A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language
 | **Database** | PostgreSQL + RLS | Multi-tenant isolation enforced at the database level, not application code |
 | **Voice** | Whisper (faster-whisper) | Local speech-to-text, no external API keys, supports 90+ languages |
 | **Frontend** | Next.js + shadcn/ui + D3.js | Server-rendered pages, accessible components, custom analytics charts |
-| **Workers** | Multiple replicas | Horizontal scaling — add workers to handle more requests |
+| **Workers** | Multiple replicas | Background processors for AI tasks — scale by adding more |
 | **Deployment** | Vercel + Railway | Frontend on edge CDN, backend on managed containers |
 
 ---
@@ -79,12 +79,12 @@ AI CLASSIFICATION — 3-tier fallback:
 |-------|--------------|
 | **Frontend** | Vercel edge CDN — already global, zero config |
 | **API** | Stateless — add replicas behind a load balancer |
-| **Workers** | Add more replicas = process more requests in parallel. Linear scaling. |
+| **Workers** | Each worker processes jobs independently. 2 workers = 2x throughput. 10 workers = 10x. Just change a number in the config. |
 | **AI** | Swap provider or add multiple endpoints. The abstraction layer makes this trivial. |
 | **Database** | Connection pooling, read replicas for analytics, table partitioning for audit logs |
 | **Redis** | Single instance handles thousands of orgs. Upgrade path: Redis Cluster for sharding |
 
-The architecture separates concerns so each layer scales independently. The most common bottleneck — AI classification — scales by simply changing the provider or adding parallel workers.
+The architecture separates concerns so each layer scales independently. The most common bottleneck — AI classification — scales by adding more workers. During peak check-in hours, spin up 10 workers. At 2 AM, scale back to 2. The queue absorbs the burst and workers drain it at their own pace.
 
 ---
 
