@@ -302,6 +302,8 @@ export function createClassificationWorker() {
           type: "routed",
           department: dept.name,
           priority: result.urgency,
+          summary: result.summary,
+          translated: result.translated,
           slaDeadline: slaDeadline.toISOString(),
         }),
       );
