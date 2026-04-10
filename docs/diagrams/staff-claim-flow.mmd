@@ -1,0 +1,57 @@
+sequenceDiagram
+    actor Staff as Staff Browser
+    participant WS as WebSocket Connection
+    participant API as Elysia API (Railway)
+    participant PG as PostgreSQL
+    participant Redis as Redis (BullMQ + Pub/Sub)
+    actor OtherStaff as Other Staff Browsers
+    participant SSE as SSE Connection
+    actor Guest as Guest Browser
+
+    Note over Staff,Guest: Staff connects and receives initial state
+
+    Staff->>API: WebSocket upgrade /ws/dashboard {org_id, dept_id, token}
+    API->>PG: SELECT workflows WHERE org_id = ? AND status IN ('open','claimed')
+    PG-->>API: workflow[]
+    API->>Redis: SUBSCRIBE org:{org_id}:workflows
+    API->>Redis: SUBSCRIBE org:{org_id}:dept:{dept_id}
+    API->>Staff: WebSocket → snapshot {workflows: [...]}
+
+    Note over Staff,Guest: Staff claims a workflow
+
+    Staff->>API: POST /workflows/:id/claim {staff_id}
+    API->>PG: SELECT workflow WHERE id = ? FOR UPDATE
+    PG-->>API: workflow (status: open)
+    API->>PG: UPDATE workflows SET status = 'claimed', claimed_by = staff_id, claimed_at = NOW()
+    API->>PG: INSERT INTO workflow_events (type: claimed, actor: staff_id)
+    API-->>Staff: 200 {workflow}
+
+    API->>Redis: PUBLISH org:{org_id}:workflows {type: claimed, workflow_id, staff_name}
+    API->>Redis: PUBLISH request:{request_id}:status {type: claimed, staff_name}
+
+    Redis-->>API: Pub/sub on org:{org_id}:workflows
+    API->>OtherStaff: WebSocket → card moves to "Claimed" column
+    API->>Staff: WebSocket → card moves to "Claimed" column (own view)
+
+    Redis-->>API: Pub/sub on request:{request_id}:status
+    API-->>SSE: SSE event: {status: claimed, staff_name}
+    SSE-->>Guest: "Juan is on the way"
+
+    Note over Staff,Guest: Staff resolves the workflow
+
+    Staff->>API: PATCH /workflows/:id/status {status: resolved, resolution_note}
+    API->>PG: UPDATE workflows SET status = 'resolved', resolved_at = NOW()
+    API->>PG: INSERT INTO workflow_events (type: resolved, actor: staff_id, note: resolution_note)
+    API-->>Staff: 200 {workflow}
+
+    API->>Redis: PUBLISH org:{org_id}:workflows {type: resolved, workflow_id}
+    API->>Redis: PUBLISH request:{request_id}:status {type: resolved}
+    API->>Redis: BullMQ.remove("sla_timer", {workflow_id})
+
+    Redis-->>API: Pub/sub on org:{org_id}:workflows
+    API->>OtherStaff: WebSocket → card removed from board
+    API->>Staff: WebSocket → card moves to "Resolved"
+
+    Redis-->>API: Pub/sub on request:{request_id}:status
+    API-->>SSE: SSE event: {status: resolved}
+    SSE-->>Guest: "Resolved! Your faucet has been fixed."

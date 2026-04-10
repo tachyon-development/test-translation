@@ -6,7 +6,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "seed": "bun src/seed.ts"
+    "seed": "bun src/seed.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "drizzle-orm": "^0.38.0",

@@ -1,0 +1,30 @@
+graph TB
+    subgraph "AI Classification — 3-Tier Fallback"
+        GROQ["Groq Cloud API<br/>Primary (~500ms)"]
+        OLLAMA["Ollama on Railway<br/>Fallback (~90s)"]
+        MANUAL["Manual Staff Review<br/>Last resort"]
+
+        GROQ -->|"3 failures"| OLLAMA
+        OLLAMA -->|"also fails"| MANUAL
+        OLLAMA -->|"30s recovery"| GROQ
+    end
+
+    subgraph "Real-Time — Graceful Degradation"
+        WS["WebSocket<br/>Primary"]
+        SSE["SSE<br/>Guest fallback"]
+        POLL["HTTP Polling<br/>Last resort"]
+
+        WS -->|"connection drops"| WS
+        SSE -->|"auto-reconnect"| SSE
+        POLL -->|"manual refresh"| POLL
+    end
+
+    subgraph "Data — No Single Point of Failure"
+        PG["PostgreSQL<br/>Source of truth"]
+        REDIS["Redis<br/>Cache + Queue"]
+        BULLMQ["BullMQ<br/>Retry + DLQ"]
+
+        REDIS -->|"down"| PG
+        BULLMQ -->|"job fails"| BULLMQ
+        BULLMQ -->|"max retries"| DLQ["Dead Letter Queue"]
+    end

@@ -1,0 +1,27 @@
+stateDiagram-v2
+    [*] --> GROQ_OK
+    GROQ_OK --> GROQ_OPEN: Groq fails 3× consecutively
+    GROQ_OPEN --> GROQ_HALF: 30s timeout elapsed
+    GROQ_HALF --> GROQ_OK: Groq test request succeeds
+    GROQ_HALF --> GROQ_OPEN: Groq test request fails
+
+    GROQ_OPEN --> OLLAMA_OK: Fallback to Ollama
+    OLLAMA_OK --> OLLAMA_OPEN: Ollama fails 3× consecutively
+    OLLAMA_OPEN --> OLLAMA_HALF: 30s timeout elapsed
+    OLLAMA_HALF --> OLLAMA_OK: Ollama test request succeeds
+    OLLAMA_HALF --> OLLAMA_OPEN: Ollama test request fails
+
+    OLLAMA_OPEN --> MANUAL: Both AI services down
+    MANUAL --> GROQ_HALF: Periodic retry
+
+    GROQ_OK: Groq Cloud API (primary)
+    GROQ_OK: llama-3.1-8b-instant ~500ms
+    GROQ_OPEN: Groq circuit open
+    GROQ_OPEN: Route to Ollama fallback
+    GROQ_HALF: Test single Groq request
+    OLLAMA_OK: Ollama on Railway (fallback)
+    OLLAMA_OK: llama3 — slower but local
+    OLLAMA_OPEN: Ollama circuit open
+    OLLAMA_HALF: Test single Ollama request
+    MANUAL: manual_review
+    MANUAL: Staff classifies manually
