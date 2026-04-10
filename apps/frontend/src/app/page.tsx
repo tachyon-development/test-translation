@@ -72,7 +72,7 @@ function TypewriterText({ text, className }: { text: string; className?: string 
   );
 }
 
-type ViewState = "input" | "processing" | "resolved";
+type ViewState = "input" | "processing" | "submitted" | "resolved";
 
 export default function KioskPage() {
   return (
@@ -206,7 +206,10 @@ function KioskInner() {
     }
 
     if (latestEvent.type === "routed") {
+      setDepartment(latestEvent.department as string || "Our team");
       setStatusMessage(`${latestEvent.department || "Our team"} has been notified and someone will be with you shortly.`);
+      // Transition to success state after a brief delay so user sees the stepper complete
+      setTimeout(() => setViewState("submitted"), 2000);
     }
 
     if (latestEvent.message) {
@@ -295,6 +298,10 @@ function KioskInner() {
     setRequestText("");
     setCurrentStep(0);
     setStatusMessage("");
+    setTranscript("");
+    setTranslatedText("");
+    setDetectedLang("");
+    setDepartment("");
   };
 
   return (
@@ -517,6 +524,76 @@ function KioskInner() {
                   </motion.div>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {/* ─── SUBMITTED STATE ─── */}
+          {viewState === "submitted" && (
+            <motion.div
+              key="submitted"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ type: "spring", stiffness: 250, damping: 25 }}
+              className="flex w-full max-w-md flex-col items-center gap-6"
+            >
+              {/* Success checkmark */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+                className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--status-success)]/20"
+              >
+                <svg className="h-10 w-10 text-[var(--status-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <motion.path
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </motion.div>
+
+              <div className="text-center">
+                <h2 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--text-primary)]">
+                  Request Submitted Successfully
+                </h2>
+                <p className="mt-2 text-[var(--text-secondary)]">
+                  {department ? `${department} has been notified.` : "Our team has been notified."} Someone will be with you shortly.
+                </p>
+              </div>
+
+              {/* Details card */}
+              {(department || translatedText) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="w-full rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-5 py-4 backdrop-blur-xl"
+                >
+                  {department && (
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+                      Routed to {department}
+                    </p>
+                  )}
+                  {translatedText && (
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{translatedText}</p>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Submit another */}
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                onClick={handleReset}
+                className="rounded-xl border border-white/10 bg-white/5 px-8 py-3 font-semibold text-[var(--text-primary)] transition-all hover:bg-white/10 hover:border-[var(--accent)]/30"
+              >
+                Submit Another Request
+              </motion.button>
             </motion.div>
           )}
 
