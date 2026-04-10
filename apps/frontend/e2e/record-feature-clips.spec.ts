@@ -94,9 +94,21 @@ interface ContextPair {
   rightPage: Page;
 }
 
+const SITE_PASSWORD = "OviieAiDemo2026";
+
 async function createSideBySidePair(
   browser: import('@playwright/test').Browser,
 ): Promise<ContextPair> {
+  const authCookie = {
+    name: "hospiq-auth",
+    value: SITE_PASSWORD,
+    domain: new URL(PROD_URL).hostname,
+    path: "/",
+    httpOnly: true,
+    secure: true,
+    sameSite: "Lax" as const,
+  };
+
   const leftCtx = await browser.newContext({
     viewport: { width: 640, height: 720 },
     recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
@@ -105,6 +117,11 @@ async function createSideBySidePair(
     viewport: { width: 640, height: 720 },
     recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
   });
+
+  // Set auth cookie to bypass password gate
+  await leftCtx.addCookies([authCookie]);
+  await rightCtx.addCookies([authCookie]);
+
   const leftPage = await leftCtx.newPage();
   const rightPage = await rightCtx.newPage();
   return { leftCtx, rightCtx, leftPage, rightPage };

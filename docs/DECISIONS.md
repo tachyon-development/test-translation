@@ -1,15 +1,13 @@
-# HospiQ — Architecture Decisions
+#  — Architecture Decisions
 
 **Domain:** Hospitality (Hotels & Resorts)
 **Challenge:** Real-Time AI-Powered Workflow System
 
 ---
 
-## What We Built
+## What was Built
 
 A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language. Within seconds, the AI translates their words, understands what they need (maintenance? room service? concierge?), and routes it to the right team. Staff see it appear instantly on their dashboard. The guest watches the progress in real-time on their phone.
-
-**Live demo:** https://hospiq-eight.vercel.app (password: OviieAiDemo2026)
 
 ---
 
