@@ -513,31 +513,12 @@ function KioskInner() {
                   </motion.div>
                 )}
 
-                {/* Status message */}
-                {statusMessage && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="rounded-xl border border-white/5 bg-white/[0.03] px-5 py-3 text-center backdrop-blur-xl"
-                  >
-                    <TypewriterText
-                      text={statusMessage}
-                      className="font-mono text-sm text-[var(--text-secondary)]"
-                      onComplete={() => {
-                        if (currentStep >= 4) {
-                          setTimeout(() => setShowAnotherBtn(true), 2000);
-                        }
-                      }}
-                    />
-                  </motion.div>
-                )}
-
-                {/* Submit another button — shows after typewriter finishes + 2s delay */}
-                {showAnotherBtn && (
+                {/* Submit another button — shows once routed */}
+                {currentStep >= 4 && (
                   <motion.button
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 25 }}
+                    transition={{ delay: 2, type: "spring", stiffness: 200, damping: 25 }}
                     onClick={handleReset}
                     className="mt-2 rounded-xl border border-white/10 bg-white/5 px-8 py-3 font-semibold text-[var(--text-primary)] transition-all hover:bg-white/10 hover:border-[var(--accent)]/30"
                   >
