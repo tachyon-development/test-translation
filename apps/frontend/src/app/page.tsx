@@ -43,7 +43,7 @@ function mapEventToStep(event: SSEEvent): number {
 }
 
 // Typewriter effect component
-function TypewriterText({ text, className }: { text: string; className?: string }) {
+function TypewriterText({ text, className, onComplete }: { text: string; className?: string; onComplete?: () => void }) {
   const [displayed, setDisplayed] = useState("");
 
   useEffect(() => {
@@ -53,10 +53,13 @@ function TypewriterText({ text, className }: { text: string; className?: string 
     const interval = setInterval(() => {
       i++;
       setDisplayed(text.slice(0, i));
-      if (i >= text.length) clearInterval(interval);
+      if (i >= text.length) {
+        clearInterval(interval);
+        onComplete?.();
+      }
     }, 30);
     return () => clearInterval(interval);
-  }, [text]);
+  }, [text, onComplete]);
 
   return (
     <span className={className}>
@@ -166,6 +169,7 @@ function KioskInner() {
   const [translatedText, setTranslatedText] = useState("");
   const [detectedLang, setDetectedLang] = useState("");
   const [department, setDepartment] = useState("");
+  const [showAnotherBtn, setShowAnotherBtn] = useState(false);
   const [toast, setToast] = useState<{ message: string; retryable: boolean } | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -300,6 +304,7 @@ function KioskInner() {
     setTranslatedText("");
     setDetectedLang("");
     setDepartment("");
+    setShowAnotherBtn(false);
   };
 
   return (
@@ -518,16 +523,21 @@ function KioskInner() {
                     <TypewriterText
                       text={statusMessage}
                       className="font-mono text-sm text-[var(--text-secondary)]"
+                      onComplete={() => {
+                        if (currentStep >= 4) {
+                          setTimeout(() => setShowAnotherBtn(true), 2000);
+                        }
+                      }}
                     />
                   </motion.div>
                 )}
 
-                {/* Submit another button — shows once routed */}
-                {currentStep >= 4 && (
+                {/* Submit another button — shows after typewriter finishes + 2s delay */}
+                {showAnotherBtn && (
                   <motion.button
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1, type: "spring", stiffness: 200, damping: 25 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 25 }}
                     onClick={handleReset}
                     className="mt-2 rounded-xl border border-white/10 bg-white/5 px-8 py-3 font-semibold text-[var(--text-primary)] transition-all hover:bg-white/10 hover:border-[var(--accent)]/30"
                   >
