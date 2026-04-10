@@ -190,6 +190,12 @@ export function useWebSocket() {
             );
             break;
 
+          case "workflow.deleted":
+            setWorkflows((prev) =>
+              prev.filter((w) => w.id !== msg.workflowId)
+            );
+            break;
+
           case "workflow.reassigned":
             if (msg.workflowId) {
               setWorkflows((prev) =>

@@ -389,4 +389,46 @@ export const workflowRoutes = new Elysia({ prefix: "/api/workflows" })
         priority: t.String(),
       }),
     },
-  );
+  )
+
+  // DELETE /api/workflows/:id — Delete a workflow (manager/admin only)
+  .delete("/:id", async ({ params, user, set }) => {
+    try {
+      if (!user || (user.role !== "manager" && user.role !== "admin")) {
+        set.status = 403;
+        return { error: "Only managers and admins can delete workflows" };
+      }
+
+      const [workflow] = await db
+        .select()
+        .from(schema.workflows)
+        .where(
+          and(
+            eq(schema.workflows.id, params.id),
+            eq(schema.workflows.orgId, user?.orgId ?? ""),
+          ),
+        )
+        .limit(1);
+
+      if (!workflow) {
+        set.status = 404;
+        return { error: "Workflow not found" };
+      }
+
+      // Delete related records first
+      await db.delete(schema.workflowEvents).where(eq(schema.workflowEvents.workflowId, params.id));
+      await db.delete(schema.workflows).where(eq(schema.workflows.id, params.id));
+
+      // Publish removal event
+      publishWorkflowUpdate(user.orgId ?? "", workflow.departmentId, workflow.requestId, {
+        type: "workflow.deleted",
+        workflowId: params.id,
+      });
+
+      return { ok: true };
+    } catch (err) {
+      console.error("Route error:", err);
+      set.status = 500;
+      return { error: "Failed to delete workflow" };
+    }
+  });

@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Send,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 interface WorkflowDetailProps {
@@ -160,6 +161,12 @@ export function WorkflowDetail({
         case "escalate":
           await apiRequest(`/api/workflows/${workflow.id}/escalate`, {
             method: "POST",
+            headers,
+          });
+          break;
+        case "delete":
+          await apiRequest(`/api/workflows/${workflow.id}`, {
+            method: "DELETE",
             headers,
           });
           break;
@@ -438,6 +445,26 @@ export function WorkflowDetail({
                     Escalate
                   </Button>
                 )}
+
+                {/* Delete — managers/admins only */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm("Delete this workflow? This cannot be undone.")) {
+                      handleAction("delete");
+                    }
+                  }}
+                  disabled={loading !== null}
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                >
+                  {loading === "delete" ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Delete
+                </Button>
               </div>
             </div>
           </div>
