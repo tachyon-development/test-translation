@@ -21,7 +21,7 @@ Respond with this exact JSON structure (no extra text):
   "translated": "<English translation if not already English, otherwise the same text>",
   "department": "<EXACTLY one of the department names listed above>",
   "urgency": "<low|medium|high|critical>",
-  "summary": "<brief English summary, max 100 chars>"
+  "summary": "<specific summary of what the guest wants, include key details like items requested, room issues, etc. Example: 'Guest wants a hamburger and fries delivered to room' NOT 'Food delivery request'>"
 }
 
 Urgency rules:
