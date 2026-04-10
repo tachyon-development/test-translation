@@ -63,12 +63,12 @@ test('Side-by-side: Guest submits → Staff sees in real-time', async ({ browser
 
   // Create two browser contexts with video recording
   const guestCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
   const staffCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
 
   const guestPage = await guestCtx.newPage();
@@ -153,7 +153,7 @@ test('Side-by-side: Guest submits → Staff sees in real-time', async ({ browser
       // Side-by-side MP4
       execSync(
         `ffmpeg -y -i "${guestVideoPath}" -i "${staffVideoPath}" ` +
-        `-filter_complex "[0:v]scale=640:720[left];[1:v]scale=640:720[right];[left][right]hstack=inputs=2" ` +
+        `-filter_complex "[0:v]scale=960:540[left];[1:v]scale=960:540[right];[left][right]hstack=inputs=2" ` +
         `-t 35 -r 15 "${mp4Out}"`,
         { stdio: 'pipe', timeout: 60000 }
       );
@@ -182,12 +182,12 @@ test('Side-by-side: Staff claims workflow while Guest watches', async ({ browser
   const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
 
   const staffCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
   const guestCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
 
   const staffPage = await staffCtx.newPage();
@@ -253,7 +253,7 @@ test('Side-by-side: Staff claims workflow while Guest watches', async ({ browser
     try {
       execSync(
         `ffmpeg -y -i "${guestVideoPath}" -i "${staffVideoPath}" ` +
-        `-filter_complex "[0:v]scale=640:720[left];[1:v]scale=640:720[right];[left][right]hstack=inputs=2" ` +
+        `-filter_complex "[0:v]scale=960:540[left];[1:v]scale=960:540[right];[left][right]hstack=inputs=2" ` +
         `-t 30 -r 15 "docs/demo-claim.mp4"`,
         { stdio: 'pipe', timeout: 60000 }
       );
@@ -273,12 +273,12 @@ test('Side-by-side: Mandarin guest → AI translates & routes', async ({ browser
   const staffToken = await loginAs(request, 'juan@hotel-mariana.com');
 
   const guestCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
   const staffCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: outDir, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: outDir, size: { width: 960, height: 540 } },
   });
 
   const guestPage = await guestCtx.newPage();
@@ -355,7 +355,7 @@ test('Side-by-side: Mandarin guest → AI translates & routes', async ({ browser
     try {
       execSync(
         `ffmpeg -y -i "${guestVideoPath}" -i "${staffVideoPath}" ` +
-        `-filter_complex "[0:v]scale=640:720[left];[1:v]scale=640:720[right];[left][right]hstack=inputs=2" ` +
+        `-filter_complex "[0:v]scale=960:540[left];[1:v]scale=960:540[right];[left][right]hstack=inputs=2" ` +
         `-t 40 -r 15 "docs/demo-mandarin.mp4"`,
         { stdio: 'pipe', timeout: 60000 }
       );

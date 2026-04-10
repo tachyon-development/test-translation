@@ -110,12 +110,12 @@ async function createSideBySidePair(
   };
 
   const leftCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: RAW_DIR, size: { width: 960, height: 540 } },
   });
   const rightCtx = await browser.newContext({
-    viewport: { width: 640, height: 720 },
-    recordVideo: { dir: RAW_DIR, size: { width: 640, height: 720 } },
+    viewport: { width: 960, height: 540 },
+    recordVideo: { dir: RAW_DIR, size: { width: 960, height: 540 } },
   });
 
   // Set auth cookie to bypass password gate
@@ -151,7 +151,7 @@ function stitchSideBySide(
   try {
     execSync(
       `ffmpeg -y -i "${leftPath}" -i "${rightPath}" ` +
-      `-filter_complex "[0:v]scale=640:720[left];[1:v]scale=640:720[right];[left][right]hstack=inputs=2" ` +
+      `-filter_complex "[0:v]scale=960:540[left];[1:v]scale=960:540[right];[left][right]hstack=inputs=2" ` +
       `-t ${maxDuration} -r 15 "${destPath}"`,
       { stdio: 'pipe', timeout: 60000 },
     );
@@ -222,15 +222,15 @@ test('Clip 1 - Multi-Language', async ({ browser, request }) => {
   }
   await leftPage.waitForTimeout(2000);
 
-  // AI processing phase
-  await showOverlay(leftPage, 'AI — Groq translating Mandarin + classifying');
+  // AI processing phase — wait for Groq classification + SSE to update stepper
+  await showOverlay(leftPage, 'AI — Groq translating Mandarin + classifying (~10s)');
   await showOverlay(rightPage, 'STAFF — AI processing Mandarin request...');
-  await rightPage.waitForTimeout(12000);
+  await rightPage.waitForTimeout(15000);
 
   // Results
-  await showOverlay(leftPage, 'GUEST — Request routed to Maintenance!', SAGE);
-  await showOverlay(rightPage, 'STAFF — New card: Maintenance (Critical) — auto-translated!', SAGE);
-  await leftPage.waitForTimeout(5000);
+  await showOverlay(leftPage, 'GUEST — Request routed! Team has been notified', SAGE);
+  await showOverlay(rightPage, 'STAFF — New card appeared: auto-translated from Mandarin!', SAGE);
+  await leftPage.waitForTimeout(6000);
 
   // Final hold
   await showOverlay(leftPage, 'GUEST — Progress stepper shows live status', SAGE);
