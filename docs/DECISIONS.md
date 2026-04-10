@@ -21,9 +21,9 @@ A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language
 
 - **Frontend on Vercel** — Global CDN means the guest kiosk loads fast anywhere in the world. One Next.js app serves all four views (guest, staff, manager, admin).
 
-- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. Workers run separately so slow AI processing never blocks the API. We run **2 workers for redundancy** — if one crashes, the other keeps processing.
+- **API + Workers on Railway** — The API handles HTTP requests and WebSocket connections. Workers run separately so slow AI processing never blocks the API. We run **multiple workers for redundancy** — if one crashes, the others keep processing. Adding more workers is a single config change.
 
-- **Groq for AI** — Cloud-based LLM that classifies requests in ~500ms. If Groq goes down, we fall back to a local Ollama instance. If that fails too, staff can classify manually. Three layers of redundancy.
+- **AI Classification (Groq)** — Currently using Groq's cloud API for fast classification (~500ms). The AI layer is abstracted behind a simple interface — we can swap to our own self-hosted model, OpenAI, Anthropic, or any provider with a one-line configuration change. No vendor lock-in.
 
 - **Whisper for Voice** — Converts speech to text in any language. Runs as its own service so voice processing doesn't slow down text requests.
 
@@ -37,45 +37,62 @@ A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language
 
 | Decision | What We Chose | Why |
 |----------|--------------|-----|
-| **AI Provider** | Groq cloud + Ollama fallback | Speed (~500ms) with redundancy if the cloud is down |
-| **Real-time** | WebSocket (staff) + SSE (guests) | Staff need two-way communication; guests only receive updates |
-| **Queue system** | Redis + BullMQ | One service handles queue, cache, pub/sub, and timers |
-| **Database** | PostgreSQL + Drizzle ORM | Relational data fits naturally; RLS enforces tenant isolation |
-| **Voice** | Whisper (faster-whisper) | Local speech-to-text, no API keys, supports all languages |
-| **Frontend** | Next.js + shadcn/ui + D3.js | Server-rendered pages, accessible components, custom charts |
-| **Workers** | 2 replicas | If one crashes mid-job, BullMQ re-queues to the other |
-| **Deployment** | Vercel + Railway | Frontend on CDN edge, backend on managed containers |
+| **AI Provider** | Groq cloud (swappable) | ~500ms classification; can switch to self-hosted or any OpenAI-compatible API |
+| **Real-time** | WebSocket + SSE | Staff get two-way live updates; guests receive progress via lightweight SSE |
+| **Queue system** | Redis + BullMQ | One service handles queue, cache, pub/sub, and SLA timers |
+| **Database** | PostgreSQL + RLS | Multi-tenant isolation enforced at the database level, not application code |
+| **Voice** | Whisper (faster-whisper) | Local speech-to-text, no external API keys, supports 90+ languages |
+| **Frontend** | Next.js + shadcn/ui + D3.js | Server-rendered pages, accessible components, custom analytics charts |
+| **Workers** | Multiple replicas | Horizontal scaling — add workers to handle more requests |
+| **Deployment** | Vercel + Railway | Frontend on edge CDN, backend on managed containers |
 
 ---
 
-## How It Handles Failure
+## Redundancy — Nothing Has a Single Point of Failure
 
 ```
-Guest submits request
-    │
-    ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│  Groq Cloud  │────▶│ Ollama Local │────▶│  Manual Review   │
-│  (~500ms)    │     │ (~90 sec)    │     │  (staff assigns) │
-│  PRIMARY     │     │  FALLBACK    │     │  LAST RESORT     │
-└─────────────┘     └──────────────┘     └─────────────────┘
-       │                    │
-       │  Circuit breaker:  │
-       │  3 failures = open │
-       │  30s = retry       │
+AI CLASSIFICATION — 3-tier fallback:
+
+  ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+  │  Groq Cloud  │────▶│  Self-hosted  │────▶│  Manual Review   │
+  │  (~500ms)    │     │  Ollama      │     │  (staff assigns) │
+  │  PRIMARY     │     │  FALLBACK    │     │  LAST RESORT     │
+  └─────────────┘     └──────────────┘     └─────────────────┘
+
+  Circuit breaker: 3 failures opens the circuit → fallback activates
+                   30 seconds later → retries the primary
 ```
 
-- **Worker crashes** → BullMQ detects stalled job, re-queues to other worker
-- **Redis down** → API serves from PostgreSQL, dashboard shows stale data with warning
-- **WebSocket drops** → Auto-reconnects with backoff; poll endpoint as fallback
-- **Database down** → Redis holds queued jobs; workers drain the queue on recovery
+| What Fails | What Happens | Recovery |
+|------------|-------------|----------|
+| **AI provider down** | Circuit breaker activates → falls back to self-hosted model → then manual review | Automatic, zero downtime |
+| **Worker crashes** | BullMQ detects stalled job → re-queues to another worker | Automatic, ~5 seconds |
+| **Redis down** | API serves from PostgreSQL, queue holds in memory | Dashboard stale but functional |
+| **WebSocket drops** | Auto-reconnects with exponential backoff | Transparent to user |
+| **Database down** | Redis holds queued jobs → workers drain on recovery | No data loss |
+
+---
+
+## Scalability — Built to Grow
+
+| Layer | How It Scales |
+|-------|--------------|
+| **Frontend** | Vercel edge CDN — already global, zero config |
+| **API** | Stateless — add replicas behind a load balancer |
+| **Workers** | Add more replicas = process more requests in parallel. Linear scaling. |
+| **AI** | Swap provider or add multiple endpoints. The abstraction layer makes this trivial. |
+| **Database** | Connection pooling, read replicas for analytics, table partitioning for audit logs |
+| **Redis** | Single instance handles thousands of orgs. Upgrade path: Redis Cluster for sharding |
+
+The architecture separates concerns so each layer scales independently. The most common bottleneck — AI classification — scales by simply changing the provider or adding parallel workers.
 
 ---
 
 ## What Makes It Work
 
-1. **Any language in, English out** — Groq translates and classifies in one prompt
-2. **True real-time** — WebSocket push, not polling. Staff see cards appear live
-3. **Graceful degradation** — Every critical path has a fallback
-4. **Multi-tenant by default** — PostgreSQL RLS, not application-level filtering
-5. **One command to run locally** — `docker compose up` boots all 10 services
+1. **Any language in, English out** — AI translates and classifies in one step
+2. **True real-time** — WebSocket push, not polling. Staff see cards appear live.
+3. **No single point of failure** — Every critical path has a fallback
+4. **AI provider is swappable** — Groq today, your own model tomorrow. One config change.
+5. **Multi-tenant by default** — Database-level isolation, not application-level filtering
+6. **Scales horizontally** — More workers = more throughput. No architecture changes needed.
