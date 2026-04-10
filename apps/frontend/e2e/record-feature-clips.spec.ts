@@ -109,13 +109,15 @@ async function createSideBySidePair(
     sameSite: "Lax" as const,
   };
 
+  // Left = mobile guest kiosk (iPhone-like)
   const leftCtx = await browser.newContext({
-    viewport: { width: 960, height: 540 },
-    recordVideo: { dir: RAW_DIR, size: { width: 960, height: 540 } },
+    viewport: { width: 390, height: 844 },
+    recordVideo: { dir: RAW_DIR, size: { width: 390, height: 844 } },
   });
+  // Right = full desktop dashboard
   const rightCtx = await browser.newContext({
-    viewport: { width: 960, height: 540 },
-    recordVideo: { dir: RAW_DIR, size: { width: 960, height: 540 } },
+    viewport: { width: 1280, height: 844 },
+    recordVideo: { dir: RAW_DIR, size: { width: 1280, height: 844 } },
   });
 
   // Set auth cookie to bypass password gate
@@ -149,9 +151,10 @@ function stitchSideBySide(
     return;
   }
   try {
+    // Left=mobile (390x844), Right=desktop (1280x844). Scale to same height, stack horizontally.
     execSync(
       `ffmpeg -y -i "${leftPath}" -i "${rightPath}" ` +
-      `-filter_complex "[0:v]scale=960:540[left];[1:v]scale=960:540[right];[left][right]hstack=inputs=2" ` +
+      `-filter_complex "[0:v]scale=390:844[left];[1:v]scale=1280:844[right];[left][right]hstack=inputs=2" ` +
       `-t ${maxDuration} -r 15 "${destPath}"`,
       { stdio: 'pipe', timeout: 60000 },
     );
