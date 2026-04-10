@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "test": "bun test"
+    "start": "bun src/index.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.2.0",
