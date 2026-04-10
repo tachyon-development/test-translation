@@ -1,13 +1,59 @@
-#  — Architecture Decisions
+# Architecture Decisions
 
 **Domain:** Hospitality (Hotels & Resorts)
 **Challenge:** Real-Time AI-Powered Workflow System
 
 ---
 
-## What was Built
+## What Was Built
 
 A guest at a hotel speaks into a kiosk — in Mandarin, Spanish, or any language. Within seconds, the AI translates their words, understands what they need (maintenance? room service? concierge?), and routes it to the right team. Staff see it appear instantly on their dashboard. The guest watches the progress in real-time on their phone.
+
+---
+
+## How We Meet the Four Core Requirements
+
+### 1. Real-Time Input Processing
+
+Guests submit requests two ways — **voice** or **text** — in any of 90+ languages.
+
+**Voice path:** The browser's MediaRecorder captures audio. The recording is sent to the API, which passes it (as base64) through a job queue to **Whisper** — an open-source speech-to-text model. Whisper transcribes the audio and detects the language automatically. The guest sees "Transcribing..." on their progress stepper while this happens.
+
+**Text path:** Text goes directly to classification, skipping transcription. This means text requests are processed even faster (~5 seconds end-to-end).
+
+Both paths feed into the same classification pipeline, so the rest of the system doesn't care whether the input was voice or text.
+
+### 2. AI Integration
+
+The AI does three things in a single prompt:
+- **Translates** the request to English (if it isn't already)
+- **Classifies** which department should handle it (Maintenance, Housekeeping, Kitchen, Concierge, or Front Desk)
+- **Assesses urgency** (low, medium, high, critical) which determines the SLA deadline
+
+We currently use **Groq's cloud API** running `llama-3.1-8b-instant`, which returns results in ~500ms. The AI layer is behind a simple interface — swapping to a self-hosted model, OpenAI, Anthropic, or any OpenAI-compatible API is a one-line config change. No vendor lock-in.
+
+If the AI provider is unavailable, a **circuit breaker** automatically falls back to a local Ollama instance. If that also fails, the request is flagged for **manual staff review** — the system never stops working.
+
+### 3. Workflow Generation
+
+Once the AI classifies a request, the system automatically:
+- Creates a **workflow** assigned to the correct department
+- Sets an **SLA deadline** based on urgency (e.g., critical = 15 min, low = 2 hours)
+- Schedules an **escalation timer** — if the deadline passes without resolution, the workflow auto-escalates to a manager
+- Logs everything to an **audit trail** for compliance
+
+Each workflow moves through a lifecycle: **Pending → Claimed → In Progress → Resolved** (or **Escalated** if the SLA is missed). Every state change is recorded as an event with a timestamp and the actor who made it.
+
+### 4. Multi-Client Real-Time Updates
+
+This is where the architecture gets interesting. Four different types of users watch the same data update simultaneously:
+
+- **Guests** receive updates via **Server-Sent Events (SSE)** — a lightweight one-way stream. They see their progress stepper advance: "Received → Transcribing → Understanding → Routing → Team Notified."
+- **Staff** connect via **WebSocket** — a persistent two-way connection. New workflow cards appear on their kanban board instantly. When one staff member claims a task, every other connected staff member sees the card move columns in real-time.
+- **Managers** see the same WebSocket feed but filtered to escalated items and analytics. D3.js visualizations update live.
+- **Admins** manage configuration — departments, SLA rules, users, integrations.
+
+The real-time layer works through **Redis Pub/Sub**. When a worker creates a workflow, it publishes an event to Redis. The API server subscribes to those channels and fans out to every connected WebSocket and SSE client. This decouples the AI processing (slow) from the real-time delivery (instant).
 
 ---
 
@@ -82,7 +128,7 @@ AI CLASSIFICATION — 3-tier fallback:
 | **Database** | Connection pooling, read replicas for analytics, table partitioning for audit logs |
 | **Redis** | Single instance handles thousands of orgs. Upgrade path: Redis Cluster for sharding |
 
-The architecture separates concerns so each layer scales independently. The most common bottleneck — AI classification — scales by adding more workers. During peak check-in hours, spin up 10 workers. At 2 AM, scale back to 2. The queue absorbs the burst and workers drain it at their own pace.
+The architecture separates concerns so each layer scales independently. During peak check-in hours, spin up 10 workers. At 2 AM, scale back to 2. The queue absorbs the burst and workers drain it at their own pace.
 
 ---
 
